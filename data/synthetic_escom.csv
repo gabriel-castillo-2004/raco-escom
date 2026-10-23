@@ -1,0 +1,17 @@
+materia,grupo,turno,cupo_max,inscritos_actuales,demanda_estimada
+Cálculo,1CM1,M,35,35,52
+Cálculo,1CV1,V,35,35,44
+Álgebra Lineal,1CM2,M,35,33,35
+Álgebra Lineal,1CV2,V,35,12,14
+Algoritmia,1CM3,M,35,35,48
+Algoritmia,1CV3,V,35,32,34
+Estructuras de Datos,2CM1,M,35,35,55
+Estructuras de Datos,2CV1,V,35,35,46
+Redes,3CM1,M,35,34,35
+Redes,3CV1,V,35,31,33
+Sistemas Operativos,3CM2,M,35,14,15
+Sistemas Operativos,3CV2,V,35,11,13
+Compiladores,4CM1,M,35,15,16
+Compiladores,4CV1,V,35,10,11
+Inteligencia Artificial,5CM1,M,35,35,60
+Inteligencia Artificial,5CV1,V,35,35,49
