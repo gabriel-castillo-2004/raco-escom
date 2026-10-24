@@ -20,8 +20,16 @@ st.set_page_config(
 )
 
 st.title("🎓 RACO: Risk-Adjusted Capacity Optimizer")
-st.caption("Optimización de Cupos y Oferta Académica — Escuela Superior de Cómputo (ESCOM IPN)")
+st.caption("Planificación y Optimización de Capacidad Docente — Escuela Superior de Cómputo (ESCOM IPN)")
 st.divider()
+
+# Inicialización de Session State para persistencia (Fila 8)
+if "saes_raw_text" not in st.session_state:
+    st.session_state["saes_raw_text"] = ""
+if "modo_fuente" not in st.session_state:
+    st.session_state["modo_fuente"] = "clipboard"
+if "es_sintetico" not in st.session_state:
+    st.session_state["es_sintetico"] = False
 
 # 2. Barra Lateral de Simulación (Sidebar)
 st.sidebar.header("📥 Ingesta de Datos")
@@ -29,7 +37,7 @@ st.sidebar.header("📥 Ingesta de Datos")
 metodo_ingesta = st.sidebar.radio(
     "Método de Entrada:",
     options=["Pegar desde SAES (Portapapeles)", "Subir archivo (.csv / .xlsx)"],
-    index=0,
+    index=0 if st.session_state["modo_fuente"] == "clipboard" else 1,
 )
 
 grupos_input: List[GrupoInput] = []
@@ -37,37 +45,55 @@ demanda_agregada: Dict[Tuple[str, Turno], int] = {}
 df_clipboard_raw: pd.DataFrame = pd.DataFrame()
 hubo_error_ingesta = False
 raw_source_content = ""
+lineas_omitidas = 0
 
 if metodo_ingesta == "Pegar desde SAES (Portapapeles)":
-    raw_clipboard = st.sidebar.text_area(
-        "Copiar y pegar reporte del SAES:",
-        height=180,
-        placeholder=(
-            "1AM1\tA101\tCALCULO MULTIVARIABLE\t35\t36\t-1\n"
-            "3AV2\tA204\tREDES DE COMPUTADORAS\t18\t18\t0\n"
-            "5CM1\tB301\tSISTEMAS DISTRIBUIDOS\t7\t0\t7"
-        ),
-        help="Copia directamente la tabla de ocupación/oferta del SAES y pégala aquí.",
-    )
-    col_btn1, col_btn2 = st.sidebar.columns([1, 1])
-    cargar_ejemplo = col_btn2.button("Ejemplo SAES", use_container_width=True)
+    st.session_state["modo_fuente"] = "clipboard"
+    st.session_state["es_sintetico"] = False
 
-    if cargar_ejemplo and not raw_clipboard:
-        raw_clipboard = (
-            "1CM1\tA101\tCALCULO\t35\t35\t0\n"
-            "1CV1\tA101\tCALCULO\t35\t37\t-2\n"
-            "1CM2\tA102\tALGEBRA LINEAL\t35\t33\t2\n"
-            "1CV2\tA102\tALGEBRA LINEAL\t35\t12\t23\n"
-            "3CV1\tA204\tREDES\t35\t31\t4\n"
-            "1LM1\tQ101\tLABORATORIO QUIMICA\t18\t18\t0\n"
-            "4CM1\tA405\tCOMPILADORES\t35\t14\t21\n"
-            "4CV1\tA405\tCOMPILADORES\t35\t10\t25"
-        )
+    # Mover área de pegado al cuerpo principal con expander (Filas 28 y 40)
+    with st.expander("📋 Ingesta de datos SAES (Copiar / Pegar)", expanded=(not bool(st.session_state["saes_raw_text"]))):
+        col_txt, col_ops = st.columns([4, 1])
+        with col_ops:
+            st.markdown("**Acciones Rápidas**")
+            if st.button("Cargar Ejemplo SAES", use_container_width=True):
+                st.session_state["saes_raw_text"] = (
+                    "1AM1\tA101\tFUNDAMENTOS DE PROGRAMACION\t1\t33\t33\t0\n"
+                    "2AM1\tA201\tALGEBRA LINEAL\t2\t36\t37\t-1\n"
+                    "2AV2\tA202\tCALCULO MULTIVARIABLE\t2\t36\t6\t30\n"
+                    "3AV2\tA301\tBASES DE DATOS\t3\t18\t8\t10\n"
+                    "7AV1\tA701\tADMINISTRACION DE PROYECTOS DE TI\t7\t35\t39\t-4\n"
+                    "7AX1\tA703\tTRABAJO TERMINAL I\t7\t250\t0\t250\n"
+                    "1LM1\tQ101\tLABORATORIO QUIMICA\t1\t18\t18\t0"
+                )
+                st.rerun()
 
-    raw_source_content = raw_clipboard
-    if raw_clipboard.strip():
+            if st.button("Limpiar Entrada", use_container_width=True):
+                st.session_state["saes_raw_text"] = ""
+                st.rerun()
+
+        with col_txt:
+            raw_clipboard = st.text_area(
+                "Pega directamente la tabla copiada del SAES (Ctrl+V):",
+                value=st.session_state["saes_raw_text"],
+                height=160,
+                placeholder=(
+                    "1AM1\tA101\tFUNDAMENTOS DE PROGRAMACION\t1\t33\t33\t0\n"
+                    "2AM1\tA201\tALGEBRA LINEAL\t2\t36\t37\t-1\n"
+                    "7AX1\tA703\tTRABAJO TERMINAL I\t7\t250\t0\t250"
+                ),
+            )
+            if raw_clipboard != st.session_state["saes_raw_text"]:
+                st.session_state["saes_raw_text"] = raw_clipboard
+
+    raw_source_content = st.session_state["saes_raw_text"]
+
+    if raw_source_content.strip():
         try:
-            df_clipboard_raw = parse_saes_clipboard_text(raw_clipboard)
+            total_lineas_no_vacias = len([l for l in raw_source_content.splitlines() if l.strip()])
+            df_clipboard_raw = parse_saes_clipboard_text(raw_source_content)
+            lineas_omitidas = max(0, total_lineas_no_vacias - len(df_clipboard_raw))
+
             if not df_clipboard_raw.empty:
                 for _, row in df_clipboard_raw.iterrows():
                     demanda_calc = int(row["cupo"]) - int(row["disponibles"])
@@ -79,40 +105,58 @@ if metodo_ingesta == "Pegar desde SAES (Portapapeles)":
                         cupo_max=int(row["cupo"]),
                         inscritos_actuales=int(row["inscritos"]),
                         demanda_estimada=demanda_final,
+                        materia_id=str(row["materia_id"]).strip(),
+                        semestre=int(row["semestre"]) if pd.notna(row["semestre"]) else None,
+                        carrera=str(row["carrera"]).strip(),
                     )
                     grupos_input.append(g_obj)
                     key = (g_obj.materia, g_obj.turno)
                     demanda_agregada[key] = demanda_agregada.get(key, 0) + g_obj.demanda_estimada
+
+                # Métrica y feedback de ingesta (Fila 28 y 40)
+                col_met1, col_met2 = st.columns([2, 3])
+                col_met1.success(f"✅ **{len(grupos_input)}** grupos procesados correctamente")
+                if lineas_omitidas > 0:
+                    col_met2.warning(f"⚠️ Se omitieron **{lineas_omitidas}** líneas no conformes con el formato SAES.")
             else:
-                st.sidebar.warning("⚠️ No se detectaron filas válidas en el texto pegado.")
+                st.warning("⚠️ No se detectaron filas válidas en el texto pegado.")
         except Exception as e:
-            st.sidebar.error(f"❌ Error al procesar portapapeles: {e}")
+            st.error(f"❌ Error al procesar portapapeles: {e}")
             hubo_error_ingesta = True
 else:
+    st.session_state["modo_fuente"] = "file"
     uploaded_file = st.sidebar.file_uploader(
         "Cargar Oferta / Demanda (.csv, .xlsx)",
         type=["csv", "xlsx", "xls"],
         help="Archivo con columnas: materia, grupo, turno, cupo_max, inscritos_actuales, demanda_estimada",
     )
-    btn_sintetico = st.sidebar.button("Cargar sintéticos de ESCOM", use_container_width=True)
+    btn_sintetico = st.sidebar.button("Cargar sintéticos de ESCOM (Demo)", use_container_width=True)
 
     default_csv = Path("data/synthetic_escom.csv")
     file_to_parse = None
 
     if uploaded_file is not None:
         file_to_parse = uploaded_file
-        raw_source_content = uploaded_file.name
-    elif btn_sintetico or "loaded_synthetic" in st.session_state or default_csv.exists():
-        st.session_state["loaded_synthetic"] = True
+        # Fila 43: Hashear el contenido binario/texto decodificado en utf-8, jamás el nombre del archivo
+        file_bytes = uploaded_file.getvalue()
+        raw_source_content = file_bytes.decode("utf-8", errors="replace")
+        st.session_state["es_sintetico"] = False
+    elif btn_sintetico or st.session_state["es_sintetico"]:
+        st.session_state["es_sintetico"] = True
         file_to_parse = default_csv
         raw_source_content = default_csv.read_text(encoding="utf-8") if default_csv.exists() else "synthetic"
 
     if file_to_parse:
         try:
             grupos_input, demanda_agregada = parse_academic_data(file_to_parse)
+            st.success(f"✅ **{len(grupos_input)}** grupos cargados desde archivo.")
         except Exception as e:
             st.sidebar.error(f"❌ Error al procesar archivo: {e}")
             hubo_error_ingesta = True
+
+# Banner claro de datos sintéticos (Fila 33)
+if st.session_state.get("es_sintetico", False):
+    st.warning("⚠️ **MODO DEMOSTRACIÓN:** Utilizando datos sintéticos de prueba. No representan registros de matrícula real del SAES.")
 
 st.sidebar.header("⚙️ Parámetros de Optimización")
 
@@ -153,12 +197,25 @@ horas_por_materia = st.sidebar.number_input(
     help="Horas docentes asignadas por cada grupo activo frente a grupo.",
 )
 
-# Filtro de turno
+# Filtro de turno con soporte Turno.X
 filtro_turno = st.sidebar.selectbox(
     "Filtro de Turno",
-    options=["Todos", "Matutino (M)", "Vespertino (V)"],
+    options=["Todos", "Matutino (M)", "Vespertino (V)", "Mixto / Admin (X)"],
     index=0,
 )
+
+# Expander de Glosario e Interpretación (Fila 4)
+with st.expander("📖 ¿Cómo interpretar este informe?", expanded=False):
+    st.markdown("""
+    - **Matrícula Observada:** Alumnos registrados o con cupo agotado en SAES (no sustituye encuestas de demanda no atendida).
+    - **Tolerancia tau (τ) / Cupo Blando:** Excedente de sobrecupo admisible por grupo antes de justificar la apertura de una nueva aula.
+    - **Grupos Zombi:** Grupos con matrícula nula o mínima (≤ 0.6 del cupo modal) que ameritan consolidación.
+    - **Macro-grupos Administrativos (Turno X):** Grupos de Trabajo Terminal (250+ cupos) protegidos de partición física en aulas.
+    - **Acciones:**
+      * **CONSERVAR:** El grupo se mantiene operativo con su cupo asignado.
+      * **ABRIR:** Se requiere aperturar un grupo nuevo por exceso de matrícula observada.
+      * **CERRAR / CONSOLIDAR:** Grupo excedentario sugerido para reubicación docente.
+    """)
 
 # 3. Pipeline de Procesamiento
 if grupos_input and not hubo_error_ingesta:
@@ -202,10 +259,12 @@ if grupos_input and not hubo_error_ingesta:
         resumenes_mostrados = [r for r in resumenes_finales if r.turno == Turno.M]
     elif filtro_turno == "Vespertino (V)":
         resumenes_mostrados = [r for r in resumenes_finales if r.turno == Turno.V]
+    elif filtro_turno == "Mixto / Admin (X)":
+        resumenes_mostrados = [r for r in resumenes_finales if r.turno == Turno.X]
     else:
         resumenes_mostrados = resumenes_finales
 
-    # 4. Sección de Métricas Clave (KPIs superiores)
+    # 4. Sección de Métricas Clave (KPIs superiores con semántica de negocio) (Filas 1 y 24)
     kpi_grupos_act = sum(r.grupos_actuales for r in resumenes_mostrados)
     kpi_grupos_prop = sum(r.grupos_propuestos for r in resumenes_mostrados)
     kpi_delta = kpi_grupos_prop - kpi_grupos_act
@@ -219,16 +278,19 @@ if grupos_input and not hubo_error_ingesta:
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Grupos Actuales (SAES)", kpi_grupos_act)
     col2.metric("Grupos Propuestos", kpi_grupos_prop)
+    # Fila 1: delta_color="inverse" (más grupos es costo presupuestal; menos grupos es optimización)
     col3.metric(
-        "Delta de Grupos",
+        "Grupos a Abrir (+) / Cerrar (−)",
         f"{kpi_delta:+d}",
         delta=kpi_delta,
-        delta_color="normal",
+        delta_color="inverse",
     )
+    # Fila 24: Matrícula Observada
     col4.metric(
         "Alumnos Atendidos",
         f"{kpi_alumnos_atendidos} / {kpi_demanda_total}",
         f"{(kpi_alumnos_atendidos / kpi_demanda_total * 100):.1f}%" if kpi_demanda_total > 0 else "0%",
+        help="Proporción de alumnos cubiertos respecto a la matrícula observada.",
     )
     col5.metric(
         "Horas Docentes Requeridas",
@@ -250,7 +312,7 @@ if grupos_input and not hubo_error_ingesta:
                     hide_index=True,
                 )
 
-    # 4.1 Generación y Botón de Descarga del Dictamen Oficial en Excel
+    # 4.1 Generación y Botón de Descarga del Informe Técnico Oficial en Excel (Fila 49)
     tz_cdmx = ZoneInfo("America/Mexico_City")
     timestamp_dt = datetime.now(tz_cdmx)
     timestamp_str = timestamp_dt.strftime("%Y%m%d_%H%M%S")
@@ -260,7 +322,7 @@ if grupos_input and not hubo_error_ingesta:
         "override_cupo": override_cupo_val,
         "horas_materia": horas_por_materia,
         "timestamp": timestamp_str,
-        "git_commit_tag": "v1.2-ADR0002",
+        "git_commit_tag": "v1.2.1-hardened",
     }
 
     excel_bytes = generar_dictamen_excel(
@@ -274,16 +336,16 @@ if grupos_input and not hubo_error_ingesta:
     st.sidebar.divider()
     st.sidebar.subheader("📄 Exportación Oficial")
     st.sidebar.download_button(
-        label="📥 Descargar Dictamen Técnico Oficial (.xlsx)",
+        label="📥 Descargar Informe Técnico de Apoyo (.xlsx)",
         data=excel_bytes,
-        file_name=f"Dictamen_RACO_ESCOM_{timestamp_str}.xlsx",
+        file_name=f"Informe_Tecnico_RACO_ESCOM_{timestamp_str}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
 
     st.write("")
 
-    # 5. Pestañas de Visualización
+    # 5. Pestañas de Visualización (Fila 24: Semántica de Matrícula Observada)
     tab1, tab2, tab3, tab4 = st.tabs([
         "📊 Resumen Directivo",
         "📋 Detalle Operativo por Grupo",
@@ -299,7 +361,7 @@ if grupos_input and not hubo_error_ingesta:
             filas_resumen.append({
                 "Materia": r.materia,
                 "Turno": r.turno.value,
-                "Demanda Total": r.demanda_total,
+                "Matrícula Observada": r.demanda_total,
                 "Grupos Act.": r.grupos_actuales,
                 "Grupos Prop.": r.grupos_propuestos,
                 "Delta": r.delta_grupos,
@@ -328,7 +390,7 @@ if grupos_input and not hubo_error_ingesta:
                     "Acción": g.accion.value,
                     "Inscritos Estimados": g.inscritos_estimados,
                     "Cupo Asignado": g.cupo_asignado,
-                    "Atípico / Protegido": "Sí (Lab)" if g.es_atipico else "No",
+                    "Atípico / Protegido": "Sí" if g.es_atipico else "No",
                     "Justificación": g.justificacion,
                 })
         df_detalle = pd.DataFrame(filas_detalle)
@@ -359,9 +421,9 @@ if grupos_input and not hubo_error_ingesta:
             if sobresaturadas:
                 for s in sobresaturadas:
                     st.warning(
-                        f"**{s.materia} [{s.turno.value}]**: Demanda de **{s.demanda_total}** alumnos "
+                        f"**{s.materia} [{s.turno.value}]**: Matrícula de **{s.demanda_total}** alumnos "
                         f"excede la capacidad absorbible de los {s.grupos_actuales} grupos actuales. "
-                        f"Se abren **{s.delta_grupos}** nuevo(s) grupo(s)."
+                        f"Se sugiere abrir **{s.delta_grupos}** nuevo(s) grupo(s)."
                     )
             else:
                 st.success("No hay materias que requieran apertura de nuevos grupos con la configuración actual.")
@@ -372,8 +434,8 @@ if grupos_input and not hubo_error_ingesta:
             if subutilizadas:
                 for u in subutilizadas:
                     st.info(
-                        f"**{u.materia} [{u.turno.value}]**: Demanda de **{u.demanda_total}** alumnos. "
-                        f"Se sugiere cerrar/consolidar **{abs(u.delta_grupos)}** grupo(s) "
+                        f"**{u.materia} [{u.turno.value}]**: Matrícula de **{u.demanda_total}** alumnos. "
+                        f"Se sugiere consolidar **{abs(u.delta_grupos)}** grupo(s) "
                         f"para optimizar la asignación docente."
                     )
             else:
@@ -393,6 +455,8 @@ if grupos_input and not hubo_error_ingesta:
                 df_tiras = df_tiras[df_tiras["turno"] == Turno.M]
             elif filtro_turno == "Vespertino (V)":
                 df_tiras = df_tiras[df_tiras["turno"] == Turno.V]
+            elif filtro_turno == "Mixto / Admin (X)":
+                df_tiras = df_tiras[df_tiras["turno"] == Turno.X]
 
             semestres_disponibles = sorted(df_tiras["semestre"].unique())
 
@@ -424,8 +488,7 @@ if grupos_input and not hubo_error_ingesta:
         else:
             filas_tira = []
             for g in grupos_input:
-                sem_char = g.grupo[0]
-                semestre = int(sem_char) if sem_char.isdigit() else 1
+                semestre = g.semestre if g.semestre is not None else (int(g.grupo[0]) if g.grupo and g.grupo[0].isdigit() else 1)
                 disponibles_est = g.cupo_max - g.demanda_estimada
                 filas_tira.append({
                     "semestre": semestre,
@@ -439,6 +502,8 @@ if grupos_input and not hubo_error_ingesta:
                 df_fallback = df_fallback[df_fallback["turno"] == Turno.M]
             elif filtro_turno == "Vespertino (V)":
                 df_fallback = df_fallback[df_fallback["turno"] == Turno.V]
+            elif filtro_turno == "Mixto / Admin (X)":
+                df_fallback = df_fallback[df_fallback["turno"] == Turno.X]
 
             for sem in sorted(df_fallback["semestre"].unique()):
                 df_sem = df_fallback[df_fallback["semestre"] == sem]

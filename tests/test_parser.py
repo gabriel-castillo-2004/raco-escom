@@ -193,3 +193,55 @@ def test_saes_clipboard_parser_extracts_turno_x_trabajo_terminal():
     assert row["inscritos"] == 0
     assert row["disponibles"] == 250
     assert not row["discrepancia_saes"]
+
+
+def test_saes_real_pdf_fixture():
+    # Fila 29: Extracto textual directo del reporte oficial de Ciencia de Datos
+    raw_text = (
+        "1AM1\tA101\tFUNDAMENTOS DE PROGRAMACION\t1\t33\t33\t0\n"
+        "2AM1\tA201\tALGEBRA LINEAL\t2\t36\t37\t-1\n"
+        "2AV2\tA202\tCALCULO MULTIVARIABLE\t2\t36\t6\t30\n"
+        "3AV2\tA301\tBASES DE DATOS\t3\t18\t8\t10\n"
+        "7AV1\tA701\tADMINISTRACION DE PROYECTOS DE TI\t7\t35\t39\t-4\n"
+        "7AX1\tA703\tTRABAJO TERMINAL I\t7\t250\t0\t250\n"
+    )
+    df = parse_saes_clipboard_text(raw_text)
+
+    assert len(df) == 6
+    # 1AM1
+    r1 = df[df["grupo"] == "1AM1"].iloc[0]
+    assert r1["nombre_materia"] == "FUNDAMENTOS DE PROGRAMACION"
+    assert r1["cupo"] == 33
+    assert r1["inscritos"] == 33
+    assert r1["disponibles"] == 0
+
+    # 2AM1 (sobrecupo suave -1)
+    r2 = df[df["grupo"] == "2AM1"].iloc[0]
+    assert r2["cupo"] == 36
+    assert r2["inscritos"] == 37
+    assert r2["disponibles"] == -1
+
+    # 2AV2 (zombi)
+    r3 = df[df["grupo"] == "2AV2"].iloc[0]
+    assert r3["cupo"] == 36
+    assert r3["inscritos"] == 6
+    assert r3["disponibles"] == 30
+
+    # 3AV2 (lab 18)
+    r4 = df[df["grupo"] == "3AV2"].iloc[0]
+    assert r4["cupo"] == 18
+    assert r4["inscritos"] == 8
+    assert r4["disponibles"] == 10
+
+    # 7AV1 (sobrecupo crítico -4)
+    r5 = df[df["grupo"] == "7AV1"].iloc[0]
+    assert r5["cupo"] == 35
+    assert r5["inscritos"] == 39
+    assert r5["disponibles"] == -4
+
+    # 7AX1 (Turno X macro-grupo)
+    r6 = df[df["grupo"] == "7AX1"].iloc[0]
+    assert r6["turno"] == Turno.X
+    assert r6["cupo"] == 250
+    assert r6["inscritos"] == 0
+    assert r6["disponibles"] == 250

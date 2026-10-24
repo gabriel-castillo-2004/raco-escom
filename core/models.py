@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -18,6 +18,9 @@ class GrupoInput(BaseModel):
     cupo_max: int = Field(default=35, ge=1, description="Cupo máximo de estudiantes")
     inscritos_actuales: int = Field(default=0, ge=0, description="Alumnos inscritos formalmente")
     demanda_estimada: int = Field(default=0, ge=0, description="Demanda proyectada o preinscrita")
+    materia_id: Optional[str] = Field(default=None, description="Clave de materia SAES")
+    semestre: Optional[int] = Field(default=None, description="Semestre lectivo")
+    carrera: Optional[str] = Field(default=None, description="Sigla de la carrera")
 
 
 class AccionGrupo(str, Enum):

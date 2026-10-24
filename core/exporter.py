@@ -45,19 +45,32 @@ def _aplicar_estilo_tabla(ws, min_row, max_row, min_col, max_col):
 
 
 def _autoajustar_columnas(ws, min_col=1, max_col=None):
-    """Autoajusta el ancho de las columnas con un margen de lectura."""
+    """Autoajusta el ancho de las columnas con un margen de lectura y un tope de 50."""
     if max_col is None:
         max_col = ws.max_column
+
+    # Obtener celdas combinadas que comiencen en la hoja para no inflar columnas individuales
+    merged_cell_ranges = ws.merged_cells.ranges
 
     for col in range(min_col, max_col + 1):
         col_letter = get_column_letter(col)
         max_len = 0
         for cell in ws[col_letter]:
+            # Ignorar si es celda combinada de más de una columna
+            es_combinada = any(
+                cell.coordinate in rng and (rng.max_col > rng.min_col)
+                for rng in merged_cell_ranges
+            )
+            if es_combinada:
+                continue
+
             val_str = str(cell.value or "")
             if "\n" in val_str:
                 val_str = max(val_str.split("\n"), key=len)
             max_len = max(max_len, len(val_str))
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+        ancho_calculado = max(max_len + 4, 12)
+        ws.column_dimensions[col_letter].width = min(ancho_calculado, 50)
 
 
 def generar_dictamen_excel(
@@ -68,7 +81,7 @@ def generar_dictamen_excel(
     alertas_saes: Optional[List[Dict[str, Any]]] = None,
 ) -> BytesIO:
     """
-    Genera el libro de Excel oficial del Dictamen Técnico RACO en memoria.
+    Genera el libro de Excel oficial del Dictamen/Informe Técnico RACO en memoria.
     Contiene exactamente 4 pestañas:
       1. Carátula y Supuestos
       2. Resumen Directivo
@@ -76,7 +89,9 @@ def generar_dictamen_excel(
       4. Semáforo de Tiras
     """
     wb = openpyxl.Workbook()
-    # Eliminar hoja por defecto al final o renombrarla como la primera
+    # Habilitar recálculo forzado en visores de Excel / web / móviles
+    wb.calculation.fullCalcOnLoad = True
+
     ws_caratula = wb.active
     ws_caratula.title = "Carátula y Supuestos"
 
@@ -89,20 +104,20 @@ def generar_dictamen_excel(
     ws_detalle.views.sheetView[0].showGridLines = True
     ws_tiras.views.sheetView[0].showGridLines = True
 
-    # 1. Cálculo del Sello de Auditoría SHA-256
-    text_to_hash = raw_input_text.strip() if raw_input_text else ""
-    sha256_hash = hashlib.sha256(text_to_hash.encode("utf-8")).hexdigest().upper()
+    # 1. Normalización estricta de entrada para SHA-256 (Fila 43)
+    text_normalized = (raw_input_text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    sha256_hash = hashlib.sha256(text_normalized.encode("utf-8")).hexdigest().upper()
 
     # Fecha oficial en zona horaria America/Mexico_City
     tz_cdmx = ZoneInfo("America/Mexico_City")
     fecha_emision = datetime.now(tz_cdmx).strftime("%Y-%m-%d %H:%M:%S (%Z)")
 
     # ==========================================
-    # PESTAÑA 1: Carátula y Supuestos
+    # PESTAÑA 1: Carátula y Supuestos (Filas 45 y 49)
     # ==========================================
     ws_caratula.merge_cells("B2:G2")
     cell_title = ws_caratula["B2"]
-    cell_title.value = "DICTAMEN TÉCNICO DE APOYO - PLANIFICACIÓN DE CAPACIDAD ACADÉMICA"
+    cell_title.value = "INFORME TÉCNICO DE APOYO - PLANIFICACIÓN DE CAPACIDAD DOCENTE"
     cell_title.font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
     cell_title.fill = PatternFill(start_color=HEADER_BG, end_color=HEADER_BG, fill_type="solid")
     cell_title.alignment = Alignment(horizontal="center", vertical="center")
@@ -129,16 +144,26 @@ def generar_dictamen_excel(
     horas_materia = int(parametros.get("horas_materia", 4))
     ws_caratula["C12"] = f"{horas_materia} hrs/semana frente a grupo"
 
-    # Sello criptográfico
-    ws_caratula["B14"] = "SELLO DIGITAL DE INTEGRIDAD (SHA-256)"
+    # Bloque explícito de supuestos del modelo
+    ws_caratula["B14"] = "SUPUESTOS DEL MODELO:"
     ws_caratula["B14"].font = Font(bold=True, size=11, color="002B49")
-    ws_caratula["B15"] = "Hash Criptográfico de Entrada:"
-    ws_caratula["C15"] = sha256_hash
-    ws_caratula["C15"].font = Font(name="Consolas", size=10, bold=True, color="0A58CA")
+    ws_caratula.merge_cells("C14:G14")
+    ws_caratula["C14"] = (
+        "Capacidad modal estimada por asignatura; tolerancia tau considerada como sobrecupo admisible; "
+        "horas frente a grupo configuradas como parámetro de apoyo."
+    )
+    ws_caratula["C14"].font = Font(size=9, color="333333")
+
+    # Sello criptográfico
+    ws_caratula["B16"] = "SELLO DIGITAL DE INTEGRIDAD (SHA-256)"
+    ws_caratula["B16"].font = Font(bold=True, size=11, color="002B49")
+    ws_caratula["B17"] = "Hash Criptográfico de Entrada:"
+    ws_caratula["C17"] = sha256_hash
+    ws_caratula["C17"].font = Font(name="Consolas", size=10, bold=True, color="0A58CA")
 
     # Leyenda institucional formal
-    ws_caratula.merge_cells("B17:G19")
-    cell_leyenda = ws_caratula["B17"]
+    ws_caratula.merge_cells("B19:G21")
+    cell_leyenda = ws_caratula["B19"]
     cell_leyenda.value = (
         "Dictamen técnico de apoyo basado en registros observados en SAES. "
         "No sustituye la validación de comités de academia ni la normatividad del IPN. "
@@ -147,7 +172,7 @@ def generar_dictamen_excel(
     cell_leyenda.font = Font(italic=True, size=9, color="555555")
     cell_leyenda.alignment = Alignment(wrap_text=True, vertical="center", horizontal="left")
 
-    for r in range(4, 16):
+    for r in range(4, 18):
         ws_caratula.cell(row=r, column=2).font = Font(bold=True, color="333333")
 
     _autoajustar_columnas(ws_caratula, min_col=2, max_col=7)
@@ -182,23 +207,19 @@ def generar_dictamen_excel(
     for g in grupos_input:
         key = (g.materia, g.turno)
         if key not in meta_materia:
-            # Deducir semestre del grupo (ej. 1CM1 -> 1)
-            sem_val = int(g.grupo[0]) if g.grupo and g.grupo[0].isdigit() else 1
-            # Deducir carrera (ej. 1CM1 -> C)
-            carrera_val = "ISC"
-            if len(g.grupo) >= 3:
-                carrera_char = g.grupo[1].upper()
-                carrera_val = "IA" if carrera_char == "A" else ("CD" if carrera_char == "D" else "ISC")
+            sem_val = g.semestre if g.semestre is not None else (int(g.grupo[0]) if g.grupo and g.grupo[0].isdigit() else "N/D")
+            carrera_val = g.carrera if g.carrera is not None else "N/D"
+            clave_val = g.materia_id if g.materia_id is not None else "N/D"
             meta_materia[key] = {
                 "semestre": sem_val,
                 "carrera": carrera_val,
-                "clave": getattr(g, "materia_id", "ASIG"),
+                "clave": clave_val,
             }
 
     row_curr = 3
     for opt in optimizaciones:
         key = (opt.materia, opt.turno)
-        info = meta_materia.get(key, {"semestre": 1, "carrera": "ISC", "clave": "ASIG"})
+        info = meta_materia.get(key, {"semestre": "N/D", "carrera": "N/D", "clave": "N/D"})
         horas_calc = opt.grupos_propuestos * horas_materia
 
         if opt.delta_grupos > 0:
@@ -339,18 +360,22 @@ def generar_dictamen_excel(
     ws_tiras.row_dimensions[2].height = 28
 
     # Agrupar ofertas por (semestre, turno)
-    tiras_dict: Dict[Tuple[int, Turno], List[Dict[str, Any]]] = {}
+    tiras_dict: Dict[Tuple[Any, Turno], List[Dict[str, Any]]] = {}
     for g in grupos_input:
-        sem_num = int(g.grupo[0]) if g.grupo and g.grupo[0].isdigit() else 1
+        sem_num = g.semestre if g.semestre is not None else (int(g.grupo[0]) if g.grupo and g.grupo[0].isdigit() else "N/D")
         key = (sem_num, g.turno)
         if key not in tiras_dict:
             tiras_dict[key] = []
-        # Disponibles estimado o reportado
         disp_est = g.cupo_max - g.demanda_estimada
         tiras_dict[key].append({"materia": g.materia, "disponibles": disp_est})
 
     row_t = 3
-    for (sem, turno), items in sorted(tiras_dict.items(), key=lambda x: (x[0][0], x[0][1].value)):
+    def sort_key_tiras(item):
+        sem, turno = item[0]
+        s_val = sem if isinstance(sem, int) else 999
+        return (s_val, str(turno.value))
+
+    for (sem, turno), items in sorted(tiras_dict.items(), key=sort_key_tiras):
         total_asig = len(items)
         saturadas = [it["materia"] for it in items if it["disponibles"] <= 0]
         num_sat = len(saturadas)
@@ -372,7 +397,7 @@ def generar_dictamen_excel(
             lista_str = ", ".join(sorted(set(saturadas)))
 
         vals = [
-            f"Semestre {sem}",
+            f"Semestre {sem}" if isinstance(sem, int) else str(sem),
             turno.value,
             total_asig,
             num_sat,
@@ -401,4 +426,3 @@ def generar_dictamen_excel(
     wb.save(output_stream)
     output_stream.seek(0)
     return output_stream
-

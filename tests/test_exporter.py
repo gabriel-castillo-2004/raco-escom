@@ -61,10 +61,29 @@ def test_generar_dictamen_excel_sha256_hash_matches(sample_dataset):
 
     wb = openpyxl.load_workbook(excel_stream)
     ws_caratula = wb["Carátula y Supuestos"]
-    hash_en_celda = ws_caratula["C15"].value
+    hash_en_celda = ws_caratula["C17"].value
 
     expected_hash = hashlib.sha256(raw_text.strip().encode("utf-8")).hexdigest().upper()
     assert hash_en_celda == expected_hash
+
+
+def test_generar_dictamen_excel_sha256_crlf_normalization(sample_dataset):
+    # Fila 43: El hash generado en el libro debe ser idéntico con saltos \r\n o \n
+    _, optimizaciones, grupos, parametros = sample_dataset
+    raw_text_lf = "1CM1\tA101\tCALCULO\t35\t35\t0\n1CV1\tA101\tCALCULO\t35\t35\t0\n"
+    raw_text_crlf = "1CM1\tA101\tCALCULO\t35\t35\t0\r\n1CV1\tA101\tCALCULO\t35\t35\t0\r\n"
+
+    stream_lf = generar_dictamen_excel(raw_text_lf, optimizaciones, grupos, parametros)
+    stream_crlf = generar_dictamen_excel(raw_text_crlf, optimizaciones, grupos, parametros)
+
+    wb_lf = openpyxl.load_workbook(stream_lf)
+    wb_crlf = openpyxl.load_workbook(stream_crlf)
+
+    hash_lf = wb_lf["Carátula y Supuestos"]["C17"].value
+    hash_crlf = wb_crlf["Carátula y Supuestos"]["C17"].value
+
+    assert hash_lf == hash_crlf
+    assert hash_lf == hashlib.sha256(raw_text_lf.strip().encode("utf-8")).hexdigest().upper()
 
 
 def test_generar_dictamen_excel_totals_and_hours_match_models(sample_dataset):
@@ -87,4 +106,3 @@ def test_generar_dictamen_excel_totals_and_hours_match_models(sample_dataset):
     # Renglones de datos van desde row=3 hasta 3 + grupos_en_detalle - 1
     max_row = ws_detalle.max_row
     assert max_row - 2 == grupos_en_detalle
-
