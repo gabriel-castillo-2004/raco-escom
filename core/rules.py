@@ -64,7 +64,9 @@ def optimizar_materia_turno(
     Optimiza la oferta de grupos para una materia y turno específicos (ADR-0002).
     - Si override_cupo (o cupo_slider) es provisto, manda dicho valor.
     - De lo contrario, calcula el cupo modal entre los grupos de la materia.
-    - Soporta aislamiento de grupos con cupo atípico (cupo <= 0.6 * modal, ej. laboratorios).
+    - Soporta aislamiento y protección de grupos con cupo atípico:
+      * Laboratorios: cupo <= 0.6 * modal
+      * Macro-grupos administrativos / Trabajo Terminal: cupo >= 100 o turno == Turno.X
     - Garantiza que los alumnos asignados al atípico no excedan la demanda total disponible.
     """
     if demanda < 0:
@@ -82,10 +84,18 @@ def optimizar_materia_turno(
     existentes_turno = [g for g in grupos_materia if g.turno == turno]
     num_actuales = len(existentes_turno)
 
-    # Identificar grupos con cupo atípico (<= 0.6 * modal)
-    umbral_atipico = 0.6 * cupo_modal
-    grupos_atipicos = [g for g in existentes_turno if g.cupo_max <= umbral_atipico]
-    grupos_regulares = [g for g in existentes_turno if g.cupo_max > umbral_atipico]
+    # Identificar grupos con cupo atípico protegidos
+    umbral_laboratorio = 0.6 * cupo_modal
+    grupos_atipicos: List[GrupoInput] = []
+    grupos_regulares: List[GrupoInput] = []
+
+    for g in existentes_turno:
+        es_macro = (g.cupo_max >= 100 or g.turno == Turno.X)
+        es_lab = (g.cupo_max <= umbral_laboratorio)
+        if es_macro or es_lab:
+            grupos_atipicos.append(g)
+        else:
+            grupos_regulares.append(g)
 
     grupos_optimizados: List[OptimizacionGrupo] = []
     alumnos_atendidos_atipicos = 0
@@ -93,11 +103,17 @@ def optimizar_materia_turno(
 
     # 1. Proteger y aislar grupos atípicos (CONSERVAR)
     for g in grupos_atipicos:
+        es_macro = (g.cupo_max >= 100 or g.turno == Turno.X)
         capacidad_atipica = g.cupo_max
         inscritos_previos = g.inscritos_actuales if g.inscritos_actuales > 0 else capacidad_atipica
         alumnos_asig = min(demanda_restante, capacidad_atipica, inscritos_previos)
         demanda_restante -= alumnos_asig
         alumnos_atendidos_atipicos += alumnos_asig
+
+        if es_macro:
+            justificacion_str = "Macro-grupo administrativo / Trabajo Terminal (sin partición de aula regular)."
+        else:
+            justificacion_str = "Grupo con cupo atípico protegido (laboratorio / espacio especializado)."
 
         grupos_optimizados.append(
             OptimizacionGrupo(
@@ -107,7 +123,7 @@ def optimizar_materia_turno(
                 inscritos_estimados=alumnos_asig,
                 cupo_asignado=g.cupo_max,
                 accion=AccionGrupo.CONSERVAR,
-                justificacion="Grupo con cupo atípico protegido (laboratorio / espacio especializado).",
+                justificacion=justificacion_str,
                 es_atipico=True,
             )
         )

@@ -168,3 +168,34 @@ def test_22_grupos_atipicos_laboratorio_protegidos():
     lab_res = next(g for g in res.grupos if g.grupo_id == "1LM1")
     assert lab_res.accion == AccionGrupo.CONSERVAR
     assert lab_res.es_atipico is True
+
+
+def test_macro_grupo_trabajo_terminal_no_se_subdivide():
+    # Grupo administrativo con cupo 250 en Turno.X
+    g_tt = GrupoInput(
+        materia="Trabajo Terminal I",
+        grupo="7AX1",
+        turno=Turno.X,
+        cupo_max=250,
+        inscritos_actuales=180,
+        demanda_estimada=180,
+    )
+    res = optimizar_materia_turno(
+        materia="Trabajo Terminal I",
+        turno=Turno.X,
+        demanda=180,
+        grupos_existentes=[g_tt],
+        override_cupo=35,
+        tolerancia=2,
+    )
+
+    assert res.grupos_propuestos == 1
+    assert len(res.grupos) == 1
+    grupo_opt = res.grupos[0]
+    assert grupo_opt.grupo_id == "7AX1"
+    assert grupo_opt.turno == Turno.X
+    assert grupo_opt.cupo_asignado == 250
+    assert grupo_opt.inscritos_estimados == 180
+    assert grupo_opt.accion == AccionGrupo.CONSERVAR
+    assert grupo_opt.es_atipico is True
+    assert "Macro-grupo administrativo" in grupo_opt.justificacion

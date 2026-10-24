@@ -116,7 +116,7 @@ def parse_academic_data(
     return grupos, demanda_agregada
 
 
-GRUPO_REGEX = re.compile(r"^(?P<semestre>[1-9])(?P<carrera>[A-Za-z]+)(?P<turno>[MVmv])\d+$")
+GRUPO_REGEX = re.compile(r"^(?P<semestre>[1-9])(?P<carrera>[A-Za-z]+)(?P<turno>[MVXmvx])\d+$")
 
 
 def parse_saes_clipboard_text(raw_text: str) -> pd.DataFrame:
@@ -126,12 +126,12 @@ def parse_saes_clipboard_text(raw_text: str) -> pd.DataFrame:
     para evitar que materias con números (ej. 'TRABAJO TERMINAL 1', 'INGLES 2') rompan el orden.
 
     Extrae:
-        - grupo (ej. 1AM1, 3AV2)
-        - materia_id (ej. A101, A204)
-        - nombre_materia (ej. CALCULO MULTIVARIABLE, TRABAJO TERMINAL 1)
+        - grupo (ej. 1AM1, 3AV2, 7AX1)
+        - materia_id (ej. A101, A204, A703)
+        - nombre_materia (ej. CALCULO MULTIVARIABLE, TRABAJO TERMINAL I)
         - semestre (entero del grupo o columna)
         - carrera (siglas de la carrera, ej. 'A', 'C')
-        - turno (Turno.M o Turno.V)
+        - turno (Turno.M, Turno.V o Turno.X)
         - cupo (int)
         - inscritos (int)
         - disponibles (int, soporta números negativos como -1, -3)
@@ -190,7 +190,13 @@ def parse_saes_clipboard_text(raw_text: str) -> pd.DataFrame:
 
         carrera = grupo_match.group("carrera").upper()
         turno_letra = grupo_match.group("turno").upper()
-        turno_enum = Turno.M if turno_letra == "M" else Turno.V
+        if turno_letra == "M":
+            turno_enum = Turno.M
+        elif turno_letra == "V":
+            turno_enum = Turno.V
+        else:
+            turno_enum = Turno.X
+
         discrepancia = (cupo - inscritos) != disponibles
 
         records.append(

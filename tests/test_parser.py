@@ -28,7 +28,7 @@ def test_missing_required_columns_raises_error():
 def test_invalid_turno_value_raises_error():
     invalid_csv = StringIO(
         "materia,grupo,turno,cupo_max,inscritos_actuales,demanda_estimada\n"
-        "Cálculo,1CM1,X,35,30,40\n"
+        "Cálculo,1CM1,Z,35,30,40\n"
     )
     with pytest.raises(ValueError, match="Valores de turno inválidos"):
         parse_academic_data(invalid_csv)
@@ -175,3 +175,21 @@ def test_saes_clipboard_materia_con_numero_y_formato_oficial():
     assert ingles["inscritos"] == 32
     assert ingles["disponibles"] == -2
     assert not ingles["discrepancia_saes"]
+
+
+def test_saes_clipboard_parser_extracts_turno_x_trabajo_terminal():
+    raw_text = "7AX1\tA703\tTRABAJO TERMINAL I\t7\t250\t0\t250\n"
+    df = parse_saes_clipboard_text(raw_text)
+
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["grupo"] == "7AX1"
+    assert row["materia_id"] == "A703"
+    assert row["nombre_materia"] == "TRABAJO TERMINAL I"
+    assert row["semestre"] == 7
+    assert row["carrera"] == "A"
+    assert row["turno"] == Turno.X
+    assert row["cupo"] == 250
+    assert row["inscritos"] == 0
+    assert row["disponibles"] == 250
+    assert not row["discrepancia_saes"]
