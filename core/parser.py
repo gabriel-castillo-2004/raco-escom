@@ -1,5 +1,6 @@
 from io import BytesIO, StringIO
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Tuple, Union
 
 import pandas as pd
@@ -114,3 +115,97 @@ def parse_academic_data(
 
     return grupos, demanda_agregada
 
+
+GRUPO_REGEX = re.compile(r"^(?P<semestre>[1-9])(?P<carrera>[A-Za-z]+)(?P<turno>[MVmv])\d+$")
+
+
+def parse_saes_clipboard_text(raw_text: str) -> pd.DataFrame:
+    r"""
+    Procesa cadenas de texto continuas copiadas directamente desde el SAES de ESCOM.
+    Utiliza delimitación robusta por tabulaciones (\t) o dos o más espacios consecutivos (\s{2,})
+    para evitar que materias con números (ej. 'TRABAJO TERMINAL 1', 'INGLES 2') rompan el orden.
+
+    Extrae:
+        - grupo (ej. 1AM1, 3AV2)
+        - materia_id (ej. A101, A204)
+        - nombre_materia (ej. CALCULO MULTIVARIABLE, TRABAJO TERMINAL 1)
+        - semestre (entero del grupo o columna)
+        - carrera (siglas de la carrera, ej. 'A', 'C')
+        - turno (Turno.M o Turno.V)
+        - cupo (int)
+        - inscritos (int)
+        - disponibles (int, soporta números negativos como -1, -3)
+        - discrepancia_saes (bool: True si cupo - inscritos != disponibles)
+    """
+    columns = [
+        "grupo", "materia_id", "nombre_materia", "semestre",
+        "carrera", "turno", "cupo", "inscritos", "disponibles",
+        "discrepancia_saes"
+    ]
+    if not raw_text or not raw_text.strip():
+        return pd.DataFrame(columns=columns)
+
+    records: List[Dict[str, Any]] = []
+
+    for line in raw_text.splitlines():
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+
+        # Dividir por tabulación (\t) si está presente, o por 2 o más espacios consecutivos (\s{2,})
+        if "\t" in line_clean:
+            tokens = [t.strip() for t in line_clean.split("\t") if t.strip()]
+        else:
+            tokens = [t.strip() for t in re.split(r"\s{2,}", line_clean) if t.strip()]
+
+        # Se requieren al menos 6 tokens: grupo, materia_id, nombre_materia, [semestre opcional], cupo, inscritos, disponibles
+        if len(tokens) < 6:
+            continue
+
+        # Validar identificador de grupo
+        grupo_token = tokens[0]
+        grupo_match = GRUPO_REGEX.match(grupo_token)
+        if not grupo_match:
+            continue
+
+        materia_id = tokens[1]
+        nombre_materia = tokens[2]
+
+        # Casos según cantidad de tokens numéricos al final
+        # Formato A: grupo, materia_id, nombre_materia, cupo, inscritos, disponibles (len 6)
+        # Formato B: grupo, materia_id, nombre_materia, semestre, cupo, inscritos, disponibles (len 7)
+        try:
+            if len(tokens) >= 7 and tokens[3].isdigit():
+                semestre = int(tokens[3])
+                cupo = int(tokens[4])
+                inscritos = int(tokens[5])
+                disponibles = int(tokens[6])
+            else:
+                semestre = int(grupo_match.group("semestre"))
+                cupo = int(tokens[3])
+                inscritos = int(tokens[4])
+                disponibles = int(tokens[5])
+        except (ValueError, IndexError):
+            continue
+
+        carrera = grupo_match.group("carrera").upper()
+        turno_letra = grupo_match.group("turno").upper()
+        turno_enum = Turno.M if turno_letra == "M" else Turno.V
+        discrepancia = (cupo - inscritos) != disponibles
+
+        records.append(
+            {
+                "grupo": grupo_token,
+                "materia_id": materia_id,
+                "nombre_materia": nombre_materia,
+                "semestre": semestre,
+                "carrera": carrera,
+                "turno": turno_enum,
+                "cupo": cupo,
+                "inscritos": inscritos,
+                "disponibles": disponibles,
+                "discrepancia_saes": discrepancia,
+            }
+        )
+
+    return pd.DataFrame(records)
