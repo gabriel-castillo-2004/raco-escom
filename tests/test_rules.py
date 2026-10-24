@@ -2,6 +2,7 @@ import pytest
 from core.models import AccionGrupo, GrupoInput, Turno
 from core.rules import (
     aplicar_techo_global,
+    calcular_cupo_modal,
     calcular_grupos_necesarios,
     distribuir_alumnos_balanceado,
     optimizar_materia_turno,
@@ -17,7 +18,8 @@ def test_02_demanda_exacta_un_cupo():
 
 
 def test_03_quiebre_un_alumno_extra_abre_grupo():
-    assert calcular_grupos_necesarios(36, 35) == 2
+    # Con tolerancia=0 quiebra en 36
+    assert calcular_grupos_necesarios(36, 35, tolerancia=0) == 2
 
 
 def test_04_distribucion_equitativa_exacta():
@@ -37,7 +39,7 @@ def test_06_distribucion_equitativa_remanente_impar():
 
 
 def test_07_cupo_duro_no_se_supera():
-    res = optimizar_materia_turno("Cálculo", Turno.M, 35, [], cupo_slider=35)
+    res = optimizar_materia_turno("Cálculo", Turno.M, 35, [], override_cupo=35, tolerancia=0)
     assert all(g.inscritos_estimados <= g.cupo_asignado for g in res.grupos)
 
 
@@ -45,8 +47,8 @@ def test_08_slider_manda_sobre_cupo_saes():
     grupo = GrupoInput(
         materia="Redes", grupo="3CM1", turno=Turno.M, cupo_max=40, inscritos_actuales=30, demanda_estimada=30
     )
-    # Con cupo_slider=25 y demanda 30 -> math.ceil(30/25) = 2 grupos
-    res = optimizar_materia_turno("Redes", Turno.M, 30, [grupo], cupo_slider=25)
+    # Con override_cupo=25, tolerancia=0 y demanda 30 -> math.ceil(30/25) = 2 grupos
+    res = optimizar_materia_turno("Redes", Turno.M, 30, [grupo], override_cupo=25, tolerancia=0)
     assert res.grupos_propuestos == 2
     assert all(g.cupo_asignado == 25 for g in res.grupos)
 
@@ -107,7 +109,7 @@ def test_14_nuevo_id_formato_correcto():
 
 def test_15_error_demanda_negativa():
     with pytest.raises(ValueError, match="no puede ser negativa"):
-        calcular_grupos_necesarios(-5, 35)
+        calcular_grupos_necesarios(-5, 35, tolerancia=0)
 
 
 def test_16_error_cupo_invalido():
@@ -118,8 +120,8 @@ def test_16_error_cupo_invalido():
 def test_17_techo_global_greedy():
     # Materia 1: 36 alumnos en 2 grupos -> saturación 18 alumnos/grupo
     # Materia 2: 70 alumnos en 2 grupos -> saturación 35 alumnos/grupo
-    r1 = optimizar_materia_turno("Compiladores", Turno.M, 36, [], cupo_slider=35)  # 2 grupos
-    r2 = optimizar_materia_turno("Algoritmia", Turno.M, 70, [], cupo_slider=35)    # 2 grupos
+    r1 = optimizar_materia_turno("Compiladores", Turno.M, 36, [], cupo_slider=35, tolerancia=0)  # 2 grupos
+    r2 = optimizar_materia_turno("Algoritmia", Turno.M, 70, [], cupo_slider=35, tolerancia=0)    # 2 grupos
     # Total inicial: 4 grupos. Techo: 3 grupos.
     ajustados = aplicar_techo_global([r1, r2], max_grupos_global=3)
     assert sum(r.grupos_propuestos for r in ajustados) == 3
@@ -134,3 +136,35 @@ def test_18_determinismo_reglas():
     res2 = optimizar_materia_turno("ED", Turno.M, 55, [g1], cupo_slider=35)
     assert res1.model_dump() == res2.model_dump()
 
+
+def test_19_cupo_blando_tolerancia_dos_absorbe_hasta_38_y_quiebra_en_39():
+    # cupo 36 y tolerancia 2 -> capacidad efectiva 38
+    assert calcular_grupos_necesarios(36, 36, tolerancia=2) == 1
+    assert calcular_grupos_necesarios(37, 36, tolerancia=2) == 1
+    assert calcular_grupos_necesarios(38, 36, tolerancia=2) == 1
+    assert calcular_grupos_necesarios(39, 36, tolerancia=2) == 2
+
+
+def test_20_tolerancia_cero_replica_cupo_duro():
+    assert calcular_grupos_necesarios(35, 35, tolerancia=0) == 1
+    assert calcular_grupos_necesarios(36, 35, tolerancia=0) == 2
+
+
+def test_21_cupo_modal_por_defecto_sin_override():
+    g1 = GrupoInput(materia="Física", grupo="1CM1", turno=Turno.M, cupo_max=30, inscritos_actuales=30, demanda_estimada=30)
+    g2 = GrupoInput(materia="Física", grupo="1CM2", turno=Turno.M, cupo_max=30, inscritos_actuales=30, demanda_estimada=30)
+    g3 = GrupoInput(materia="Física", grupo="1CM3", turno=Turno.M, cupo_max=35, inscritos_actuales=35, demanda_estimada=35)
+    # Moda es 30
+    assert calcular_cupo_modal([g1, g2, g3]) == 30
+    res = optimizar_materia_turno("Física", Turno.M, 60, [g1, g2, g3], override_cupo=None, tolerancia=0)
+    assert res.grupos_propuestos == 2
+
+
+def test_22_grupos_atipicos_laboratorio_protegidos():
+    # Modal es 35. Un laboratorio tiene cupo 18 (<= 0.6 * 35 = 21)
+    g_teoria = GrupoInput(materia="Química", grupo="1CM1", turno=Turno.M, cupo_max=35, inscritos_actuales=35, demanda_estimada=35)
+    g_lab = GrupoInput(materia="Química", grupo="1LM1", turno=Turno.M, cupo_max=18, inscritos_actuales=18, demanda_estimada=18)
+    res = optimizar_materia_turno("Química", Turno.M, 35, [g_teoria, g_lab], override_cupo=35, tolerancia=2)
+    lab_res = next(g for g in res.grupos if g.grupo_id == "1LM1")
+    assert lab_res.accion == AccionGrupo.CONSERVAR
+    assert lab_res.es_atipico is True

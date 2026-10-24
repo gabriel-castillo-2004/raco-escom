@@ -36,6 +36,7 @@ class OptimizacionGrupo(BaseModel):
     cupo_asignado: int = Field(..., gt=0)
     accion: AccionGrupo
     justificacion: str
+    es_atipico: bool = Field(default=False, description="Indica si el grupo tiene cupo atípico protegido")
 
 
 class ResumenMateria(BaseModel):
