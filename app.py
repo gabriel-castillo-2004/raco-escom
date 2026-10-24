@@ -1,9 +1,12 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 
+from core.exporter import generar_dictamen_excel
 from core.models import AccionGrupo, GrupoInput, ResumenMateria, Turno
 from core.parser import parse_academic_data, parse_saes_clipboard_text
 from core.rules import aplicar_techo_global, optimizar_materia_turno
@@ -33,6 +36,7 @@ grupos_input: List[GrupoInput] = []
 demanda_agregada: Dict[Tuple[str, Turno], int] = {}
 df_clipboard_raw: pd.DataFrame = pd.DataFrame()
 hubo_error_ingesta = False
+raw_source_content = ""
 
 if metodo_ingesta == "Pegar desde SAES (Portapapeles)":
     raw_clipboard = st.sidebar.text_area(
@@ -60,6 +64,7 @@ if metodo_ingesta == "Pegar desde SAES (Portapapeles)":
             "4CV1\tA405\tCOMPILADORES\t35\t10\t25"
         )
 
+    raw_source_content = raw_clipboard
     if raw_clipboard.strip():
         try:
             df_clipboard_raw = parse_saes_clipboard_text(raw_clipboard)
@@ -96,9 +101,11 @@ else:
 
     if uploaded_file is not None:
         file_to_parse = uploaded_file
+        raw_source_content = uploaded_file.name
     elif btn_sintetico or "loaded_synthetic" in st.session_state or default_csv.exists():
         st.session_state["loaded_synthetic"] = True
         file_to_parse = default_csv
+        raw_source_content = default_csv.read_text(encoding="utf-8") if default_csv.exists() else "synthetic"
 
     if file_to_parse:
         try:
@@ -230,9 +237,11 @@ if grupos_input and not hubo_error_ingesta:
     )
 
     # Alerta de discrepancias del SAES si aplica
+    alertas_saes_list = []
     if not df_clipboard_raw.empty and "discrepancia_saes" in df_clipboard_raw.columns:
         discrepancias = df_clipboard_raw[df_clipboard_raw["discrepancia_saes"] == True]
         if not discrepancias.empty:
+            alertas_saes_list = discrepancias.to_dict(orient="records")
             with st.expander(f"⚠️ Alerta: Se detectaron {len(discrepancias)} inconsistencias en datos SAES (cupo - inscritos ≠ disponibles)", expanded=False):
                 st.caption("Estas discrepancias suelen ocurrir por bajas no consolidadas o sobrecupos no autorizados en el SAES.")
                 st.dataframe(
@@ -240,6 +249,37 @@ if grupos_input and not hubo_error_ingesta:
                     use_container_width=True,
                     hide_index=True,
                 )
+
+    # 4.1 Generación y Botón de Descarga del Dictamen Oficial en Excel
+    tz_cdmx = ZoneInfo("America/Mexico_City")
+    timestamp_dt = datetime.now(tz_cdmx)
+    timestamp_str = timestamp_dt.strftime("%Y%m%d_%H%M%S")
+
+    parametros_dictamen = {
+        "tolerancia_tau": tolerancia_tau,
+        "override_cupo": override_cupo_val,
+        "horas_materia": horas_por_materia,
+        "timestamp": timestamp_str,
+        "git_commit_tag": "v1.2-ADR0002",
+    }
+
+    excel_bytes = generar_dictamen_excel(
+        raw_input_text=raw_source_content,
+        optimizaciones=resumenes_finales,
+        grupos_input=grupos_input,
+        parametros=parametros_dictamen,
+        alertas_saes=alertas_saes_list,
+    )
+
+    st.sidebar.divider()
+    st.sidebar.subheader("📄 Exportación Oficial")
+    st.sidebar.download_button(
+        label="📥 Descargar Dictamen Técnico Oficial (.xlsx)",
+        data=excel_bytes,
+        file_name=f"Dictamen_RACO_ESCOM_{timestamp_str}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
 
     st.write("")
 
@@ -347,7 +387,6 @@ if grupos_input and not hubo_error_ingesta:
             "agotadas o saturadas (disponibles ≤ 0), lo que rompe la tira reglamentaria."
         )
 
-        # Si tenemos los datos con columnas completas (del portapapeles)
         if not df_clipboard_raw.empty and "semestre" in df_clipboard_raw.columns:
             df_tiras = df_clipboard_raw.copy()
             if filtro_turno == "Matutino (M)":
@@ -383,7 +422,6 @@ if grupos_input and not hubo_error_ingesta:
             else:
                 st.info("No hay datos de semestre para mostrar con el filtro actual.")
         else:
-            # Fallback para archivos CSV sintéticos usando el primer carácter del grupo como semestre
             filas_tira = []
             for g in grupos_input:
                 sem_char = g.grupo[0]
