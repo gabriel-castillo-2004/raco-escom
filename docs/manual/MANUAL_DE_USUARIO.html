@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manual de Usuario y Guía de Operación E2E — RACO v1.2 (ESCOM - IPN)</title>
+  <style>
+    :root {
+      --ipn-blue: #002B49;
+      --ipn-blue-light: #0A4168;
+      --ipn-guinda: #6B1D2F;
+      --bg-page: #F4F6F9;
+      --bg-card: #FFFFFF;
+      --text-main: #1E293B;
+      --text-muted: #475569;
+      --border-subtle: #CBD5E1;
+      --accent-green: #166534;
+      --accent-green-bg: #DCFCE7;
+      --accent-amber: #92400E;
+      --accent-amber-bg: #FEF3C7;
+      --accent-red: #991B1B;
+      --accent-red-bg: #FEE2E2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px 16px 48px;
+      font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      color: var(--text-main);
+      background-color: var(--bg-page);
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .document-container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 43, 73, 0.08);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+
+    /* Barra flotante de impresion (solo en pantalla) */
+    .print-toolbar {
+      max-width: 960px;
+      margin: 0 auto 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #FFFFFF;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .print-toolbar span {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .btn-print {
+      background-color: var(--ipn-blue);
+      color: #FFFFFF;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-print:hover {
+      background-color: var(--ipn-blue-light);
+    }
+
+    /* Portada Institucional */
+    .cover-header {
+      background: linear-gradient(135deg, var(--ipn-blue) 0%, #003E6B 100%);
+      color: #FFFFFF;
+      padding: 40px 48px 34px;
+      border-bottom: 6px solid var(--ipn-guinda);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .cover-badges {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .badge {
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      color: #F8FAFC;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .cover-header h1 {
+      margin: 0 0 10px;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      line-height: 1.25;
+    }
+
+    .cover-header p.subtitle {
+      margin: 0 0 22px;
+      font-size: 15px;
+      color: #E2E8F0;
+      font-weight: 400;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      background: rgba(0, 22, 38, 0.45);
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 12.5px;
+    }
+
+    .meta-item strong {
+      display: block;
+      color: #94A3B8;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .meta-item span {
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    /* Contenido Principal */
+    .content-body {
+      padding: 36px 48px 48px;
+    }
+
+    h2 {
+      color: var(--ipn-blue);
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--ipn-blue);
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    h2:first-of-type {
+      margin-top: 0;
+    }
+
+    h3 {
+      color: var(--ipn-blue-light);
+      font-size: 17px;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    h4 {
+      color: var(--ipn-guinda);
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 22px;
+      margin-bottom: 8px;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    p {
+      margin: 0 0 12px;
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin: 0 0 16px;
+      padding-left: 22px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    code {
+      font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+      background-color: #F1F5F9;
+      color: #0F172A;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      border: 1px solid #E2E8F0;
+    }
+
+    /* Tarjetas de Principios */
+    .principles-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin: 18px 0 24px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .principle-card {
+      background: #F8FAFC;
+      border: 1px solid var(--border-subtle);
+      border-left: 4px solid var(--ipn-blue);
+      border-radius: 6px;
+      padding: 14px 16px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .principle-card strong {
+      display: block;
+      color: var(--ipn-blue);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .principle-card p {
+      margin: 0;
+      font-size: 13.5px;
+      color: var(--text-muted);
+      text-align: left;
+    }
+
+    /* Bloques de Paso e Imagenes */
+    .step-section {
+      margin-bottom: 28px;
+    }
+
+    figure.screenshot-card {
+      margin: 18px 0 24px;
+      padding: 14px;
+      background: #F8FAFC;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    figure.screenshot-card img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+      border-radius: 5px;
+      border: 1px solid #CBD5E1;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    }
+
+    figure.screenshot-card figcaption {
+      margin-top: 10px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* Callouts y Notas */
+    .callout {
+      background-color: #EFF6FF;
+      border-left: 4px solid var(--ipn-blue);
+      padding: 14px 18px;
+      border-radius: 0 6px 6px 0;
+      margin: 16px 0;
+      font-size: 13.5px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .callout strong {
+      color: var(--ipn-blue);
+    }
+
+    /* Semaforo Badges */
+    .status-pill {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 12px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .pill-red { background: var(--accent-red-bg); color: var(--accent-red); }
+    .pill-amber { background: var(--accent-amber-bg); color: var(--accent-amber); }
+    .pill-green { background: var(--accent-green-bg); color: var(--accent-green); }
+
+    /* Tablas Estilizadas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px;
+      font-size: 13.5px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    th {
+      background-color: var(--ipn-blue);
+      color: #FFFFFF;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      border: 1px solid var(--ipn-blue);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td {
+      padding: 9px 14px;
+      border: 1px solid var(--border-subtle);
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #F8FAFC;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* FAQ */
+    .faq-item {
+      margin-bottom: 16px;
+      padding: 14px 18px;
+      background: #F8FAFC;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .faq-item h4 {
+      margin: 0 0 6px;
+      color: var(--ipn-blue);
+    }
+
+    .faq-item p {
+      margin: 0;
+      font-size: 13.5px;
+    }
+
+    .footer-institutional {
+      margin-top: 36px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Reglas especificas para Impresion / Guardar como PDF (Ctrl+P) */
+    @media print {
+      @page {
+        size: letter;
+        margin: 12mm 14mm;
+      }
+
+      body {
+        background: #FFFFFF;
+        padding: 0;
+        font-size: 13px;
+      }
+
+      .print-toolbar {
+        display: none !important;
+      }
+
+      .document-container {
+        max-width: 100%;
+        box-shadow: none;
+        border: none;
+        border-radius: 0;
+      }
+
+      .cover-header {
+        padding: 26px 32px 22px;
+        border-radius: 6px;
+      }
+
+      .content-body {
+        padding: 20px 8px;
+      }
+
+      figure.screenshot-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        margin: 12px 0 18px;
+        padding: 10px;
+      }
+
+      figure.screenshot-card img {
+        max-height: 360px;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
+      }
+
+      h2, h3, h4 {
+        page-break-after: avoid;
+        break-after: avoid;
+      }
+
+      .principle-card, .faq-item, .callout, table {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-toolbar">
+    <span><strong>RACO v1.2 — ESCOM IPN</strong> | Documento optimizado para exportación a PDF (<code>Ctrl + P</code>)</span>
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+  </div>
+
+  <div class="document-container">
+    <!-- Portada Institucional -->
+    <header class="cover-header">
+      <div class="cover-badges">
+        <span class="badge">Instituto Politécnico Nacional</span>
+        <span class="badge">Escuela Superior de Cómputo (ESCOM)</span>
+        <span class="badge">RACO v1.2.1-hardened</span>
+      </div>
+      <h1>MANUAL DE USUARIO Y GUÍA DE OPERACIÓN E2E — RACO v1.2</h1>
+      <p class="subtitle">Risk-Adjusted Capacity Optimizer — Planeación y Optimización de Capacidad Docente sobre Cortes de Ocupabilidad del SAES</p>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <strong>Unidad Académica</strong>
+          <span>ESCOM — IPN</span>
+        </div>
+        <div class="meta-item">
+          <strong>Arquitectura</strong>
+          <span>ADR-0001 &amp; ADR-0002</span>
+        </div>
+        <div class="meta-item">
+          <strong>Trazabilidad</strong>
+          <span>Sello Criptográfico SHA-256</span>
+        </div>
+        <div class="meta-item">
+          <strong>Costo e Invasión</strong>
+          <span>$0 MXN / Cero Invasión SAES</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="content-body">
+
+      <!-- Seccion 1 -->
+      <section>
+        <h2>1. Introducción y Propósito</h2>
+        <p>
+          <strong>RACO (<em>Risk-Adjusted Capacity Optimizer</em>)</strong> es una herramienta de ingeniería de software y soporte a la decisión diseñada para las Jefaturas de Departamento Académico y la Subdirección Académica de la <strong>Escuela Superior de Cómputo (ESCOM - IPN)</strong>. Su objetivo es automatizar en segundos el diagnóstico de ocupabilidad y la planeación de apertura, conservación o cierre de grupos docentes a partir de los reportes tabulares del <strong>Sistema de Administración Escolar (SAES)</strong>.
+        </p>
+
+        <div class="principles-grid">
+          <div class="principle-card">
+            <strong>1. Cero Costo ($0 MXN)</strong>
+            <p>Desarrollado al 100% con tecnologías abiertas (Python 3.12, Streamlit, Pydantic v2, OpenPyXL), sin licencias comerciales ni servidores de pago.</p>
+          </div>
+          <div class="principle-card">
+            <strong>2. Cero Invasión al SAES (Zero-Footprint)</strong>
+            <p>No solicita contraseñas, no realiza conexiones directas a la base de datos del SAES ni requiere instalar agentes en los equipos institucionales.</p>
+          </div>
+          <div class="principle-card">
+            <strong>3. Ingesta por Portapapeles (ADR-0001)</strong>
+            <p>Procesa tablas copiadas del navegador (<code>Ctrl+C</code> / <code>Ctrl+V</code>), tolerando tabuladores, espacios, sobrecupos negativos (<code>-1</code> a <code>-4</code>) y turnos <code>M</code>, <code>V</code> y <code>X</code>.</p>
+          </div>
+          <div class="principle-card">
+            <strong>4. Cupo Blando y Protección (ADR-0002)</strong>
+            <p>Aplica tolerancia de sobrecupo (&tau; = 2), deduce el cupo modal por asignatura y blinda automáticamente laboratorios (18 plazas) y Trabajo Terminal (250 plazas).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Seccion 2 -->
+      <section>
+        <h2>2. Flujo Operativo End-to-End (E2E) en 4 Pasos</h2>
+        <p>
+          El flujo operativo completo —desde la consulta del reporte en el SAES hasta la descarga del Informe Técnico en Excel con sello criptográfico SHA-256— se completa en cuatro pasos secuenciales.
+        </p>
+
+        <!-- Paso 1 -->
+        <div class="step-section">
+          <h3>Paso 1: Captura de Ocupabilidad en SAES</h3>
+          <ol>
+            <li>Ingrese al portal del <strong>SAES ESCOM</strong> y diríjase al menú <code>Inicio &raquo; Académica &raquo; Ocupabilidad Horario</code>.</li>
+            <li>Seleccione el <strong>Periodo Escolar Actual</strong>, la <strong>Carrera</strong> (ej. <em>Licenciatura en Ciencia de Datos</em>) y el <strong>Plan de Estudios</strong>.</li>
+            <li>Seleccione con el cursor las filas de la tabla de ocupabilidad (columnas <code>Grupo | Materia | Nombre de la Materia | Semestre | Cupo | Inscritos | Disponibles</code>) y presione <code>Ctrl + C</code>.</li>
+          </ol>
+
+          <figure class="screenshot-card">
+            <img src="img/01_saes_fuente.png" alt="Paso 1: Reporte de Ocupabilidad en el SAES de ESCOM" />
+            <figcaption>Figura 1. Consulta del Reporte de Ocupabilidad Horario en el SAES de ESCOM (Licenciatura en Ciencia de Datos).</figcaption>
+          </figure>
+        </div>
+
+        <!-- Paso 2 -->
+        <div class="step-section">
+          <h3>Paso 2: Interfaz e Ingesta en RACO</h3>
+          <ol>
+            <li>Abra la interfaz de <strong>RACO</strong>. En la barra lateral izquierda encontrará el selector de <strong>Método de Entrada</strong> con la opción predeterminada <em>&ldquo;Pegar desde SAES (Portapapeles)&rdquo;</em> (o <em>&ldquo;Subir archivo (.csv / .xlsx)&rdquo;</em>).</li>
+            <li>Pegue los registros copiados del SAES dentro del cuadro de texto central con <code>Ctrl + V</code> (o presione el botón <strong>&ldquo;Cargar Ejemplo SAES&rdquo;</strong> para ejecutar una demostración inmediata).</li>
+            <li>Ajuste en el panel izquierdo los parámetros de planeación si lo requiere:
+              <ul>
+                <li><strong>Tolerancia de Sobrecupo (&tau;):</strong> Margen admisible de sobrecupo por grupo antes de abrir una nueva sección (por defecto: <code>2</code> alumnos).</li>
+                <li><strong>Forzar cupo uniforme global:</strong> Desmarcado por defecto para respetar el <em>Cupo Modal</em> propio de cada asignatura.</li>
+                <li><strong>Horas semanales frente a grupo por materia:</strong> Carga horaria base para estimar horas docentes (por defecto: <code>4</code> hrs/semana).</li>
+                <li><strong>Filtro de Turno:</strong> <code>Todos</code>, Matutino (<code>M</code>), Vespertino (<code>V</code>) o Mixto/Administrativo (<code>X</code>).</li>
+              </ul>
+            </li>
+          </ol>
+
+          <figure class="screenshot-card">
+            <img src="img/02_raco_inicio.png" alt="Paso 2a: Pantalla inicial de RACO y barra lateral de parametros" />
+            <figcaption>Figura 2. Pantalla inicial de RACO con el área de ingesta por portapapeles y configuración de parámetros.</figcaption>
+          </figure>
+
+          <p>
+            Al ingresar los datos, el analizador léxico valida la estructura de cada grupo y muestra de inmediato el cintillo verde de confirmación con el <strong>contador de grupos procesados correctamente</strong>.
+          </p>
+
+          <figure class="screenshot-card">
+            <img src="img/03_raco_ingesta_procesada.png" alt="Paso 2b: Ingesta procesada con contador de grupos" />
+            <figcaption>Figura 3. Confirmación instantánea de ingesta (7 grupos procesados correctamente) y despliegue del tablero de diagnóstico.</figcaption>
+          </figure>
+        </div>
+
+        <!-- Paso 3 -->
+        <div class="step-section">
+          <h3>Paso 3: Análisis y Diagnóstico en Pantalla</h3>
+
+          <h4>3.1 KPIs Superiores y Horas Docentes</h4>
+          <p>
+            En la parte superior del tablero se calculan instantáneamente los <strong>5 Indicadores Clave de Desempeño (KPIs)</strong>:
+            <strong>Grupos Actuales (SAES)</strong>, <strong>Grupos Propuestos</strong>, <strong>Grupos a Abrir (+) / Cerrar (-)</strong>, <strong>Alumnos Atendidos (100% bajo política de cero rechazo)</strong> y <strong>Horas Docentes Requeridas</strong> por semana.
+          </p>
+
+          <figure class="screenshot-card">
+            <img src="img/04_raco_kpis_superiores.png" alt="Paso 3.1: KPIs Superiores y Horas Docentes" />
+            <figcaption>Figura 4. Franja ejecutiva de KPIs superiores mostrando el diferencial neto de grupos (+1), atención del 100% de la matrícula (141/141) y 32 hrs/sem requeridas.</figcaption>
+          </figure>
+
+          <h4>3.2 Resumen Directivo y Detección de Desbalances</h4>
+          <p>
+            La pestaña <strong>📊 Resumen Directivo</strong> consolida la matrícula observada por asignatura y turno:
+          </p>
+          <ul>
+            <li><strong>Absorción por Cupo Blando (&tau; = 2):</strong> En <em>Álgebra Lineal</em> (Turno <code>M</code>, matrícula de <code>37</code> sobre cupo de <code>36</code>), el excedente de 1 alumno es absorbido dentro de la tolerancia &tau;, manteniendo <code>1</code> grupo (<code>Delta = 0</code>) y evitando abrir un grupo adicional inviable.</li>
+            <li><strong>Apertura Justificada por Demanda:</strong> En <em>Administración de Proyectos de TI</em> (Turno <code>V</code>, matrícula de <code>39</code>), la demanda supera el umbral máximo permitido (<code>35 + 2 = 37</code>), por lo que RACO recomienda pasar de <code>1</code> a <code>2</code> grupos (<code>Delta = +1</code>), equilibrando el cupo promedio en <code>19.5</code> alumnos.</li>
+          </ul>
+
+          <figure class="screenshot-card">
+            <img src="img/05_raco_resumen_directivo.png" alt="Paso 3.2: Resumen Directivo consolidado por materia y turno" />
+            <figcaption>Figura 5. Tabla de Resumen Directivo con el consolidado de matrícula, grupos actuales, grupos propuestos y delta por asignatura.</figcaption>
+          </figure>
+
+          <h4>3.3 Protección de Laboratorios y Macro-Grupos de Trabajo Terminal</h4>
+          <p>
+            La pestaña <strong>📋 Detalle Operativo por Grupo</strong> expone la decisión individual para cada grupo (<code>CONSERVAR</code>, <code>ABRIR</code> o <code>CERRAR</code>) aplicando las reglas de protección del <strong>ADR-0002</strong>:
+          </p>
+          <ul>
+            <li><strong>Respeto a Laboratorios:</strong> Grupos con cupo restringido por infraestructura física (ej. <code>1LM1</code> en <em>Laboratorio Química</em> con cupo de <code>18</code> plazas) mantienen su capacidad nominal intacta.</li>
+            <li><strong>Protección de Macro-Grupos Administrativos (<code>Atípico / Protegido = Sí</code>):</strong> Secciones como <code>7AX1</code> (<em>Trabajo Terminal I</em>, Turno <code>X</code>, cupo <code>250</code>) son aisladas automáticamente para que su cupo administrativo no distorsione la moda estadística ni se sugiera su cierre cuando registran <code>0</code> inscritos.</li>
+          </ul>
+
+          <figure class="screenshot-card">
+            <img src="img/06_raco_detalle_laboratorios.png" alt="Paso 3.3: Detalle Operativo por Grupo con proteccion de laboratorios y Trabajo Terminal" />
+            <figcaption>Figura 6. Detalle Operativo por Grupo mostrando la apertura sugerida (V-NUEVO-2), conservación de laboratorio (18 plazas) y blindaje de Trabajo Terminal I (7AX1, cupo 250).</figcaption>
+          </figure>
+
+          <h4>3.4 Semáforo de Tiras Curriculares y Tiras Bloqueadas</h4>
+          <p>
+            La pestaña <strong>🚦 Semáforo de Tiras</strong> evalúa la salud de los paquetes curriculares por semestre para prevenir que los alumnos queden impedidos de inscribir su carga completa:
+          </p>
+          <ul>
+            <li><span class="status-pill pill-red">🔴 Tira Bloqueada</span> Todas las asignaturas del semestre tienen disponibilidad agotada o sobrecupo negativo (<code>Disponibles &le; 0</code>).</li>
+            <li><span class="status-pill pill-amber">🟡 Tira en Riesgo</span> Al menos una asignatura del semestre agotó sus lugares disponibles, generando un cuello de botella horario.</li>
+            <li><span class="status-pill pill-green">🟢 Tira Saludable</span> Todas las asignaturas evaluadas del semestre cuentan con cupo disponible.</li>
+          </ul>
+
+          <figure class="screenshot-card">
+            <img src="img/07_raco_semaforo_tiras.png" alt="Paso 3.4: Semaforo de Tiras Curriculares por Semestre" />
+            <figcaption>Figura 7. Diagnóstico de Paquetes Curriculares por Semestre identificando tiras bloqueadas (Semestre 1) y tiras en riesgo (Semestres 2 y 7).</figcaption>
+          </figure>
+        </div>
+
+        <!-- Paso 4 -->
+        <div class="step-section">
+          <h3>Paso 4: Exportación y Trazabilidad Criptográfica (SHA-256)</h3>
+          <p>
+            Al hacer clic en el botón <strong>&ldquo;📥 Descargar Informe Técnico (.xlsx)&rdquo;</strong> de la barra lateral, RACO genera en memoria un libro oficial de Microsoft Excel con <strong>4 pestañas formateadas</strong>:
+            <code>Carátula y Supuestos</code>, <code>Resumen Directivo</code>, <code>Detalle por Grupo</code> y <code>Semáforo de Tiras</code>.
+          </p>
+
+          <figure class="screenshot-card">
+            <img src="img/08_excel_caratula_sha256.png" alt="Paso 4: Informe Tecnico en Excel con Caratula y Sello SHA-256" />
+            <figcaption>Figura 8. Libro de Excel generado por RACO mostrando la Carátula Institucional, los supuestos del modelo y el Sello Digital de Integridad SHA-256.</figcaption>
+          </figure>
+
+          <div class="callout">
+            <strong>🔒 Garantía de Integridad Forense (SHA-256):</strong> El hash criptográfico de 64 caracteres hexadecimales impreso en la fila 17 de la carátula se calcula sobre el lote de entrada normalizado. Permite verificar en cualquier reunión de Academia o Subdirección que el dictamen proviene exactamente del corte oficial del SAES sin alteraciones manuales.
+          </div>
+        </div>
+      </section>
+
+      <!-- Seccion 3 -->
+      <section>
+        <h2>3. Preguntas Frecuentes y Soporte Técnico</h2>
+
+        <div class="faq-item">
+          <h4>¿Por qué el SAES reporta valores negativos en la columna &ldquo;Disponibles&rdquo; (ej. -1, -3)?</h4>
+          <p>Durante las reinscripciones e inscripciones por comisaría, se autorizan sobrecupos por encima de la capacidad nominal del aula. Como el SAES calcula <code>Disponibles = Cupo - Inscritos</code>, el resultado es negativo. RACO procesa nativamente estos sobrecupos y los incorpora en la pestaña de diagnóstico.</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>¿Qué ocurre si al copiar del SAES se incluyen encabezados o renglones vacíos?</h4>
+          <p>El analizador léxico (<code>core/parser.py</code>) filtra y descarta automáticamente encabezados repetidos, líneas en blanco y texto de navegación, procesando únicamente los renglones con nomenclatura válida de grupo politécnico (ej. <code>1AM1</code>, <code>2AV2</code>, <code>7AX1</code>).</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>¿Por qué los grupos de Trabajo Terminal (7AX1 / 8AX1) no se cierran aunque tengan 0 inscritos?</h4>
+          <p>Conforme al <strong>ADR-0002</strong>, todo grupo en turno mixto/administrativo (<code>Turno X</code>) o con cupo &ge; 100 plazas se clasifica como <em>Macro-Grupo Administrativo Protegido</em>. Se conserva íntegro para no afectar el registro administrativo de titulación y seguimiento.</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Referencia Institucional</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Institución y Unidad</strong></td>
+              <td>Instituto Politécnico Nacional — Escuela Superior de Cómputo (ESCOM)</td>
+            </tr>
+            <tr>
+              <td><strong>Sistema y Versión</strong></td>
+              <td>RACO (<em>Risk-Adjusted Capacity Optimizer</em>) — <code>v1.2.1-hardened</code></td>
+            </tr>
+            <tr>
+              <td><strong>Verificación de Calidad</strong></td>
+              <td>Suite automatizada <code>pytest</code> con 42 pruebas unitarias y de integración en verde</td>
+            </tr>
+            <tr>
+              <td><strong>Repositorio Oficial</strong></td>
+              <td><code>github.com/angel-dev-18/raco-escom</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="footer-institutional">
+        Escuela Superior de Cómputo (ESCOM — IPN) &bull; RACO v1.2 — Informe y Documentación Técnica de Apoyo a la Planeación Docente
+      </footer>
+
+    </main>
+  </div>
+
+</body>
+</html>
