@@ -106,3 +106,21 @@ def test_generar_dictamen_excel_totals_and_hours_match_models(sample_dataset):
     # Renglones de datos van desde row=3 hasta 3 + grupos_en_detalle - 1
     max_row = ws_detalle.max_row
     assert max_row - 2 == grupos_en_detalle
+    assert ws_detalle.cell(row=2, column=7).value == "Atípico / Protegido"
+
+
+def test_generar_dictamen_excel_atipico_label_lab_and_tt():
+    g_tt = GrupoInput(
+        materia="TRABAJO TERMINAL I",
+        grupo="7AX1",
+        turno=Turno.X,
+        cupo_max=250,
+        inscritos_actuales=0,
+        demanda_estimada=0,
+    )
+    opt_tt = optimizar_materia_turno("TRABAJO TERMINAL I", Turno.X, 0, [g_tt])
+    stream = generar_dictamen_excel("7AX1\tA703\tTRABAJO TERMINAL I\t7\t250\t0\t250", [opt_tt], [g_tt], {})
+    wb = openpyxl.load_workbook(stream)
+    ws_detalle = wb["Detalle por Grupo"]
+    assert ws_detalle.cell(row=2, column=7).value == "Atípico / Protegido"
+    assert ws_detalle.cell(row=3, column=7).value == "Sí (Lab / TT)"

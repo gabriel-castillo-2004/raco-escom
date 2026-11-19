@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from core.models import GrupoInput, Turno
-from core.parser import parse_academic_data, parse_saes_clipboard_text
+from core.parser import (
+    generar_plantilla_excel,
+    parse_academic_data,
+    parse_saes_clipboard_text,
+)
 
 
 def test_parse_synthetic_csv_file():
@@ -245,3 +249,69 @@ def test_saes_real_pdf_fixture():
     assert r6["cupo"] == 250
     assert r6["inscritos"] == 0
     assert r6["disponibles"] == 250
+
+
+def test_parse_academic_data_saes_exported_csv_with_negative_disponibles():
+    saes_csv = StringIO(
+        "Grupo,Clave,Materia,Cupo,Inscritos,Disponibles\n"
+        "1AM1,A101,FUNDAMENTOS DE PROGRAMACION,33,33,0\n"
+        "2AM1,A201,ALGEBRA LINEAL,36,37,-1\n"
+        "7AV1,A701,ADMINISTRACION DE PROYECTOS DE TI,35,39,-4\n"
+        "7AX1,A703,TRABAJO TERMINAL I,250,0,250\n"
+    )
+    grupos, demanda = parse_academic_data(saes_csv)
+
+    assert len(grupos) == 4
+    assert grupos[0].grupo == "1AM1"
+    assert grupos[0].turno == Turno.M
+    assert grupos[0].semestre == 1
+    assert grupos[0].materia_id == "A101"
+    assert grupos[0].demanda_estimada == 33
+
+    # Sobrecupo -1 -> demanda_estimada = max(37, 36 - (-1)) = 37
+    assert grupos[1].grupo == "2AM1"
+    assert grupos[1].inscritos_actuales == 37
+    assert grupos[1].demanda_estimada == 37
+    assert demanda[("ALGEBRA LINEAL", Turno.M)] == 37
+
+    # Sobrecupo -4 -> demanda_estimada = max(39, 35 - (-4)) = 39
+    assert grupos[2].grupo == "7AV1"
+    assert grupos[2].turno == Turno.V
+    assert grupos[2].demanda_estimada == 39
+    assert demanda[("ADMINISTRACION DE PROYECTOS DE TI", Turno.V)] == 39
+
+    # Macro-grupo 7AX1 Turno X
+    assert grupos[3].grupo == "7AX1"
+    assert grupos[3].turno == Turno.X
+    assert grupos[3].cupo_max == 250
+    assert grupos[3].demanda_estimada == 0
+
+
+def test_parse_academic_data_saes_excel_template_and_official_headers():
+    import pandas as pd
+
+    # 1. Validar que la plantilla descargable (.xlsx) sea parseable directamente
+    plantilla_stream = generar_plantilla_excel()
+    grupos_plantilla, demanda_plantilla = parse_academic_data(plantilla_stream)
+    assert len(grupos_plantilla) == 3
+    assert demanda_plantilla[("ALGEBRA LINEAL", Turno.M)] == 37
+
+    # 2. Validar DataFrame con encabezados literales de la tabla web del SAES
+    df_saes_web = pd.DataFrame([
+        {
+            "Grupo": "2AV2",
+            "Materia": "A202",
+            "Nombre de la Materia": "CALCULO MULTIVARIABLE",
+            "Semestre": 2,
+            "Cupo": 36,
+            "Inscritos": 40,
+            "Disponibles": -4,
+        }
+    ])
+    grupos_web, demanda_web = parse_academic_data(df_saes_web)
+    assert len(grupos_web) == 1
+    assert grupos_web[0].materia == "CALCULO MULTIVARIABLE"
+    assert grupos_web[0].materia_id == "A202"
+    assert grupos_web[0].turno == Turno.V
+    assert grupos_web[0].demanda_estimada == 40
+    assert demanda_web[("CALCULO MULTIVARIABLE", Turno.V)] == 40

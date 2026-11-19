@@ -5,6 +5,7 @@ from core.rules import (
     calcular_cupo_modal,
     calcular_grupos_necesarios,
     distribuir_alumnos_balanceado,
+    evaluar_semaforo_tiras,
     optimizar_materia_turno,
 )
 
@@ -199,3 +200,73 @@ def test_macro_grupo_trabajo_terminal_no_se_subdivide():
     assert grupo_opt.accion == AccionGrupo.CONSERVAR
     assert grupo_opt.es_atipico is True
     assert "Macro-grupo administrativo" in grupo_opt.justificacion
+
+
+def test_23_evaluar_semaforo_tiras_tres_estados_verde_amarillo_rojo():
+    grupos = [
+        # Semestre 1 Matutino: 2 de 2 saturados -> ROJO (🔴)
+        GrupoInput(materia="Cálculo", grupo="1AM1", turno=Turno.M, semestre=1, cupo_max=35, inscritos_actuales=35, demanda_estimada=35),
+        GrupoInput(materia="Programación", grupo="1AM2", turno=Turno.M, semestre=1, cupo_max=35, inscritos_actuales=37, demanda_estimada=37),
+        # Semestre 2 Matutino: 1 de 2 saturado -> AMARILLO (🟡)
+        GrupoInput(materia="Álgebra Lineal", grupo="2AM1", turno=Turno.M, semestre=2, cupo_max=36, inscritos_actuales=37, demanda_estimada=37),
+        GrupoInput(materia="Cálculo Multivariable", grupo="2AM2", turno=Turno.M, semestre=2, cupo_max=36, inscritos_actuales=20, demanda_estimada=20),
+        # Semestre 3 Vespertino: 0 de 2 saturados -> VERDE (🟢)
+        GrupoInput(materia="Bases de Datos", grupo="3AV1", turno=Turno.V, semestre=3, cupo_max=30, inscritos_actuales=18, demanda_estimada=18),
+        GrupoInput(materia="Redes", grupo="3AV2", turno=Turno.V, semestre=3, cupo_max=30, inscritos_actuales=22, demanda_estimada=22),
+    ]
+
+    diagnosticos = evaluar_semaforo_tiras(grupos)
+    assert len(diagnosticos) == 3
+
+    # Semestre 1 M -> ROJO
+    d_sem1 = diagnosticos[0]
+    assert (d_sem1["semestre"], d_sem1["turno"]) == (1, Turno.M)
+    assert d_sem1["estado"] == "ROJO"
+    assert d_sem1["icono"] == "🔴"
+    assert d_sem1["grupos_saturados"] == 2
+    assert d_sem1["materias_saturadas"] == ["Cálculo", "Programación"]
+
+    # Semestre 2 M -> AMARILLO
+    d_sem2 = diagnosticos[1]
+    assert (d_sem2["semestre"], d_sem2["turno"]) == (2, Turno.M)
+    assert d_sem2["estado"] == "AMARILLO"
+    assert d_sem2["icono"] == "🟡"
+    assert d_sem2["grupos_saturados"] == 1
+    assert d_sem2["materias_saturadas"] == ["Álgebra Lineal"]
+
+    # Semestre 3 V -> VERDE
+    d_sem3 = diagnosticos[2]
+    assert (d_sem3["semestre"], d_sem3["turno"]) == (3, Turno.V)
+    assert d_sem3["estado"] == "VERDE"
+    assert d_sem3["icono"] == "🟢"
+    assert d_sem3["grupos_saturados"] == 0
+    assert d_sem3["materias_saturadas"] == []
+
+
+def test_24_evaluar_semaforo_tiras_separa_matutino_y_vespertino_mismo_semestre():
+    grupos = [
+        # Semestre 2 Matutino: saturado (ROJO)
+        GrupoInput(materia="Álgebra Lineal", grupo="2CM1", turno=Turno.M, cupo_max=35, inscritos_actuales=36, demanda_estimada=36),
+        # Semestre 2 Vespertino: libre (VERDE)
+        GrupoInput(materia="Álgebra Lineal", grupo="2CV1", turno=Turno.V, cupo_max=35, inscritos_actuales=12, demanda_estimada=12),
+    ]
+
+    todos = evaluar_semaforo_tiras(grupos)
+    assert len(todos) == 2
+
+    bloque_m = next(b for b in todos if b["turno"] == Turno.M)
+    bloque_v = next(b for b in todos if b["turno"] == Turno.V)
+
+    assert bloque_m["semestre"] == 2
+    assert bloque_m["estado"] == "ROJO"
+    assert bloque_m["icono"] == "🔴"
+
+    assert bloque_v["semestre"] == 2
+    assert bloque_v["estado"] == "VERDE"
+    assert bloque_v["icono"] == "🟢"
+
+    # Validar filtro por turno opcional
+    solo_v = evaluar_semaforo_tiras(grupos, filtro_turno=Turno.V)
+    assert len(solo_v) == 1
+    assert solo_v[0]["turno"] == Turno.V
+    assert solo_v[0]["estado"] == "VERDE"

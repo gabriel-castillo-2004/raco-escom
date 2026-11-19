@@ -9,6 +9,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from core.models import GrupoInput, ResumenMateria, Turno
+from core.rules import evaluar_semaforo_tiras
 
 # Paleta de colores institucionales y semáforos
 HEADER_BG = "002B49"  # Azul institucional profundo
@@ -105,8 +106,13 @@ def generar_dictamen_excel(
     ws_tiras.views.sheetView[0].showGridLines = True
 
     # 1. Normalización estricta de entrada para SHA-256 (Fila 43)
-    text_normalized = (raw_input_text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-    sha256_hash = hashlib.sha256(text_normalized.encode("utf-8")).hexdigest().upper()
+    if parametros.get("input_sha256"):
+        sha256_hash = str(parametros["input_sha256"]).strip().upper()
+    elif isinstance(raw_input_text, (bytes, bytearray)):
+        sha256_hash = hashlib.sha256(raw_input_text).hexdigest().upper()
+    else:
+        text_normalized = (raw_input_text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        sha256_hash = hashlib.sha256(text_normalized.encode("utf-8")).hexdigest().upper()
 
     # Fecha oficial en zona horaria America/Mexico_City
     tz_cdmx = ZoneInfo("America/Mexico_City")
@@ -290,7 +296,7 @@ def generar_dictamen_excel(
         "Acción",
         "Cupo Asignado",
         "Inscritos Estimados",
-        "Atípico / Lab",
+        "Atípico / Protegido",
         "Justificación",
     ]
 
@@ -312,7 +318,7 @@ def generar_dictamen_excel(
                 g.accion.value,
                 g.cupo_asignado,
                 g.inscritos_estimados,
-                "Sí (Lab)" if g.es_atipico else "No",
+                "Sí (Lab / TT)" if g.es_atipico else "No",
                 g.justificacion,
             ]
             for c_idx, val in enumerate(vals, start=1):
@@ -359,42 +365,28 @@ def generar_dictamen_excel(
 
     ws_tiras.row_dimensions[2].height = 28
 
-    # Agrupar ofertas por (semestre, turno)
-    tiras_dict: Dict[Tuple[Any, Turno], List[Dict[str, Any]]] = {}
-    for g in grupos_input:
-        sem_num = g.semestre if g.semestre is not None else (int(g.grupo[0]) if g.grupo and g.grupo[0].isdigit() else "N/D")
-        key = (sem_num, g.turno)
-        if key not in tiras_dict:
-            tiras_dict[key] = []
-        disp_est = g.cupo_max - g.demanda_estimada
-        tiras_dict[key].append({"materia": g.materia, "disponibles": disp_est})
-
     row_t = 3
-    def sort_key_tiras(item):
-        sem, turno = item[0]
-        s_val = sem if isinstance(sem, int) else 999
-        return (s_val, str(turno.value))
+    for tira in evaluar_semaforo_tiras(grupos_input):
+        sem = tira["semestre"]
+        turno = tira["turno"]
+        total_asig = tira["total_grupos"]
+        num_sat = tira["grupos_saturados"]
+        materias_sat = tira["materias_saturadas"]
+        diag = tira["diagnostico_excel"]
+        estado = tira["estado"]
 
-    for (sem, turno), items in sorted(tiras_dict.items(), key=sort_key_tiras):
-        total_asig = len(items)
-        saturadas = [it["materia"] for it in items if it["disponibles"] <= 0]
-        num_sat = len(saturadas)
-
-        if num_sat == 0:
-            diag = "🟢 TIRA COMPLETA GARANTIZADA"
+        if estado == "VERDE":
             fill_diag = FILL_CONSERVAR
             font_diag = FONT_CONSERVAR
             lista_str = "Ninguna (Cupo disponible en todas)"
-        elif num_sat < total_asig:
-            diag = "🟡 TIRA EN RIESGO (PARCIALMENTE AGOTADA)"
+        elif estado == "AMARILLO":
             fill_diag = "FFF3CD"
             font_diag = "664D03"
-            lista_str = ", ".join(sorted(set(saturadas)))
+            lista_str = ", ".join(materias_sat)
         else:
-            diag = "🔴 TIRA BLOQUEADA (SIN CUPO)"
             fill_diag = FILL_CERRAR
             font_diag = FONT_CERRAR
-            lista_str = ", ".join(sorted(set(saturadas)))
+            lista_str = ", ".join(materias_sat)
 
         vals = [
             f"Semestre {sem}" if isinstance(sem, int) else str(sem),

@@ -1,6 +1,6 @@
 from collections import Counter
 import math
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.models import AccionGrupo, GrupoInput, OptimizacionGrupo, ResumenMateria, Turno
 
@@ -261,3 +261,83 @@ def aplicar_techo_global(resumenes: List[ResumenMateria], max_grupos_global: int
         total_propuestos = sum(r.grupos_propuestos for r in resultado)
 
     return resultado
+
+
+def evaluar_semaforo_tiras(
+    grupos_input: List[GrupoInput],
+    filtro_turno: Optional[Turno] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Evalúa la salud de los paquetes curriculares (tiras) agrupando por (semestre, turno).
+    Descarta grupos sin semestre válido (None o <= 0).
+
+    Estados evaluados por bloque (semestre, turno):
+      - ROJO (🔴 Tira Bloqueada): Todas las materias/grupos del bloque están saturados (disponibles <= 0).
+      - AMARILLO (🟡 Tira Comprometida): Al menos 1 grupo está saturado, pero existen otros con disponibilidad.
+      - VERDE (🟢 Tira Fluida / Libre): Todos los grupos evaluados del bloque tienen plazas disponibles (> 0).
+    """
+    bloques: Dict[Tuple[int, Turno], List[Dict[str, Any]]] = {}
+
+    for g in grupos_input:
+        if filtro_turno is not None and g.turno != filtro_turno:
+            continue
+
+        sem_val: Optional[int] = g.semestre
+        if sem_val is None and g.grupo and g.grupo[0].isdigit():
+            sem_val = int(g.grupo[0])
+
+        if sem_val is None or sem_val <= 0:
+            continue
+
+        demanda_efectiva = max(g.inscritos_actuales, g.demanda_estimada)
+        disponibles_reales = g.cupo_max - demanda_efectiva
+
+        key = (sem_val, g.turno)
+        if key not in bloques:
+            bloques[key] = []
+        bloques[key].append(
+            {
+                "materia": g.materia,
+                "grupo": g.grupo,
+                "disponibles": disponibles_reales,
+            }
+        )
+
+    resultados: List[Dict[str, Any]] = []
+    for (sem, turno), items in sorted(bloques.items(), key=lambda item: (item[0][0], item[0][1].value)):
+        total_grupos = len(items)
+        saturados = [it["materia"] for it in items if it["disponibles"] <= 0]
+        num_saturados = len(saturados)
+        materias_saturadas = sorted(set(saturados))
+
+        if num_saturados == 0:
+            estado = "VERDE"
+            icono = "🟢"
+            etiqueta = "Tira Fluida / Libre"
+            diag_excel = "🟢 TIRA COMPLETA GARANTIZADA"
+        elif num_saturados < total_grupos:
+            estado = "AMARILLO"
+            icono = "🟡"
+            etiqueta = "Tira Comprometida"
+            diag_excel = "🟡 TIRA EN RIESGO (PARCIALMENTE AGOTADA)"
+        else:
+            estado = "ROJO"
+            icono = "🔴"
+            etiqueta = "Tira Bloqueada"
+            diag_excel = "🔴 TIRA BLOQUEADA (SIN CUPO)"
+
+        resultados.append(
+            {
+                "semestre": sem,
+                "turno": turno,
+                "total_grupos": total_grupos,
+                "grupos_saturados": num_saturados,
+                "materias_saturadas": materias_saturadas,
+                "estado": estado,
+                "icono": icono,
+                "etiqueta": etiqueta,
+                "diagnostico_excel": diag_excel,
+            }
+        )
+
+    return resultados
