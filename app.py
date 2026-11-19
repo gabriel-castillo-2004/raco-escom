@@ -47,6 +47,41 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# CSS Responsivo Ligero para Móviles, Tablets y Escritorio
+st.markdown(
+    """
+    <style>
+    @media (max-width: 768px) {
+        html, body, [data-testid="stAppViewContainer"], .main .block-container {
+            overflow-x: hidden !important;
+        }
+        .main .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1.5rem !important;
+        }
+        [data-testid="stMetricValue"] {
+            font-size: 1.45rem !important;
+            line-height: 1.25 !important;
+            white-space: normal !important;
+            overflow-wrap: break-word !important;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.85rem !important;
+            white-space: normal !important;
+        }
+        div[data-testid="stDialog"] button,
+        .stButton > button {
+            min-height: 2.6rem !important;
+            padding: 0.35rem 0.75rem !important;
+            font-size: 0.9rem !important;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 EJEMPLO_SAES_TEXT = (
     "1AM1\tA101\tFUNDAMENTOS DE PROGRAMACION\t1\t33\t33\t0\n"
     "2AM1\tA201\tALGEBRA LINEAL\t2\t36\t37\t-1\n"
@@ -715,14 +750,23 @@ if grupos_input and not hubo_error_ingesta:
     )
     kpi_horas_docentes = kpi_grupos_prop * int(horas_por_materia)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Grupos Actuales (SAES)", kpi_grupos_act)
-    col2.metric("Grupos Propuestos", kpi_grupos_prop)
+    col1, col2, col3, col4, col5 = st.columns(5, gap="small")
+    col1.metric(
+        "Grupos Actuales",
+        kpi_grupos_act,
+        help="Total de grupos registrados actualmente en el corte del SAES.",
+    )
+    col2.metric(
+        "Grupos Propuestos",
+        kpi_grupos_prop,
+        help="Total de grupos recomendados por el motor RACO.",
+    )
     col3.metric(
-        "Grupos a Abrir (+) / Cerrar (−)",
+        "Abrir (+) / Cerrar (−)",
         f"{kpi_delta:+d}",
         delta=kpi_delta,
         delta_color="inverse",
+        help="Diferencial neto de grupos respecto a la oferta actual del SAES.",
     )
     col4.metric(
         "Alumnos Atendidos",
@@ -731,7 +775,7 @@ if grupos_input and not hubo_error_ingesta:
         help="Proporción de alumnos cubiertos respecto a la matrícula observada.",
     )
     col5.metric(
-        "Horas Docentes Requeridas",
+        "Horas Docentes",
         f"{kpi_horas_docentes} hrs/sem",
         help=f"Calculado como {kpi_grupos_prop} grupos propuestos × {horas_por_materia} hrs/materia",
     )
