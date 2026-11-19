@@ -1,5 +1,6 @@
 from datetime import datetime
 import hashlib
+import importlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import unicodedata
@@ -7,6 +8,23 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+
+import core.models
+import core.parser
+import core.rules
+
+if (
+    not hasattr(core.parser, "generar_plantilla_excel")
+    or not hasattr(core.rules, "evaluar_semaforo_tiras")
+):
+    importlib.reload(core.models)
+    importlib.reload(core.parser)
+    importlib.reload(core.rules)
+
+import core.exporter
+
+if not hasattr(core.exporter, "evaluar_semaforo_tiras"):
+    importlib.reload(core.exporter)
 
 from core.exporter import generar_dictamen_excel
 from core.models import AccionGrupo, GrupoInput, ResumenMateria, Turno
@@ -313,12 +331,13 @@ def mostrar_modal_tutorial() -> None:
     if paso_idx < total_pasos - 1:
         col_skip, col_prev, col_next = st.columns([1.2, 1, 1.2])
         with col_skip:
-            st.button(
+            if st.button(
                 "⏭️ Saltar tutorial",
                 use_container_width=True,
                 key="btn_tut_skip",
                 on_click=_on_tutorial_close,
-            )
+            ):
+                st.rerun()
         with col_prev:
             st.button(
                 "⬅️ Anterior",
@@ -345,20 +364,22 @@ def mostrar_modal_tutorial() -> None:
                 on_click=_on_tutorial_prev,
             )
         with col_demo:
-            st.button(
+            if st.button(
                 "🚀 Probar con Ejemplo SAES",
                 use_container_width=True,
                 key="btn_tut_demo",
                 on_click=_on_tutorial_demo,
-            )
+            ):
+                st.rerun()
         with col_finish:
-            st.button(
+            if st.button(
                 "✅ ¡Empezar a usar RACO!",
                 type="primary",
                 use_container_width=True,
                 key="btn_tut_finish",
                 on_click=_on_tutorial_close,
-            )
+            ):
+                st.rerun()
 
 
 def _on_textarea_change() -> None:
